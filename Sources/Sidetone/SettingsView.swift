@@ -11,6 +11,7 @@ import SwiftUI
     }
 
     @ObservedObject var model: MonitorModel
+    let openAbout: () -> Void
     @State private var pane = Pane.sound
 
     var body: some View {
@@ -133,8 +134,9 @@ import SwiftUI
                     .foregroundStyle(.secondary)
             }
             Section {
+                Button("About Sidetone", action: openAbout)
+            } footer: {
                 Text("Audio stays on this Mac. Sidetone does not record audio.")
-                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }

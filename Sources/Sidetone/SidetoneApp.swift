@@ -16,6 +16,11 @@ enum SidetoneApp {
         menu.addItem(applicationItem)
         let applicationMenu = NSMenu(title: "Sidetone")
         applicationMenu.addItem(
+            withTitle: "About Sidetone", action: #selector(AppDelegate.showAbout(_:)),
+            keyEquivalent: ""
+        ).target = delegate
+        applicationMenu.addItem(.separator())
+        applicationMenu.addItem(
             withTitle: "Settings…", action: #selector(AppDelegate.showSettings(_:)),
             keyEquivalent: ","
         ).target = delegate
@@ -103,7 +108,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             window = settingsWindow
         } else {
             window = NSWindow(
-                contentViewController: NSHostingController(rootView: SettingsView(model: model)))
+                contentViewController: NSHostingController(
+                    rootView: SettingsView(model: model) { [weak self] in self?.showAbout(nil) }))
             window.styleMask = [.titled, .closable]
             window.title = "Sidetone Settings"
             window.isReleasedWhenClosed = false
@@ -116,6 +122,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         NSApp.activate(ignoringOtherApps: true)
         popover.performClose(nil)
         updateInterfaceVisibility()
+    }
+
+    @objc func showAbout(_ sender: Any?) {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let credits = NSMutableAttributedString(
+            string: """
+                Native macOS app for low-latency, real-time microphone monitoring through headphones.
+
+                Developer: @KarstenEconomou
+
+                GitHub Repository
+                """,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: paragraph,
+            ])
+        credits.addAttribute(
+            .link, value: "https://github.com/KarstenEconomou",
+            range: (credits.string as NSString).range(of: "@KarstenEconomou"))
+        credits.addAttribute(
+            .link, value: "https://github.com/KarstenEconomou/sidetone",
+            range: (credits.string as NSString).range(of: "GitHub Repository"))
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        NSApp.activate(ignoringOtherApps: true)
+        popover.performClose(nil)
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)
