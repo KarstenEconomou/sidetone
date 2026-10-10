@@ -55,9 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem = item
         if let button = item.button {
-            button.image = SidetoneGlyph.image(
-                size: NSSize(width: 18, height: 18), template: true, active: false)
-            button.image?.accessibilityDescription = "Sidetone is off"
+            button.image = SidetoneGlyph.menuBarImage(active: false)
             button.target = self
             button.action = #selector(togglePopover)
             button.toolTip = "Sidetone — Off"
@@ -71,10 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         model.$phase.sink { [weak self] phase in
             MainActor.assumeIsolated {
                 let active = phase == .monitoring
-                let image = SidetoneGlyph.image(
-                    size: NSSize(width: 18, height: 18), template: true, active: active)
-                image.accessibilityDescription = active ? "Sidetone is on" : "Sidetone is off"
-                self?.statusItem?.button?.image = image
+                self?.statusItem?.button?.image = SidetoneGlyph.menuBarImage(active: active)
                 self?.statusItem?.button?.toolTip =
                     active ? "Sidetone — Monitoring" : "Sidetone — Off"
             }
