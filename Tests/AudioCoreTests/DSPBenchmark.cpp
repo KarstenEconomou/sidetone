@@ -20,19 +20,21 @@ int main() {
         times.clear();
         for (int pass = 0; pass < iterations; ++pass) {
             for (std::uint32_t index = 0; index < frames; ++index)
-                samples[index] = 0.1f * std::sin(static_cast<float>(pass * frames + index) * 0.137f);
+                samples[index] =
+                    0.1f * std::sin(static_cast<float>(pass * frames + index) * 0.137f);
             const auto start = std::chrono::steady_clock::now();
-            dsp.process(samples.data(), frames);
+            dsp.process(samples);
             const auto stop = std::chrono::steady_clock::now();
             times.push_back(std::chrono::duration<double, std::micro>(stop - start).count());
             checksum += samples[0];
         }
         double sum = 0;
-        for (double time : times) sum += time;
+        for (double time : times)
+            sum += time;
         std::sort(times.begin(), times.end());
-        std::cout << "Profile " << profile << ": 128 frames at 48000 Hz; mean "
-                  << sum / iterations << " us; p99 " << times[iterations * 99 / 100]
-                  << " us; max " << times.back() << " us\n";
+        std::cout << "Profile " << profile << ": 128 frames at 48000 Hz; mean " << sum / iterations
+                  << " us; p99 " << times[iterations * 99 / 100] << " us; max " << times.back()
+                  << " us\n";
     }
     sidetone::AdaptiveTransport transport;
     transport.prepare(96000, 48000, frames * 2, frames);
@@ -41,17 +43,19 @@ int main() {
         input[index] = 0.1f * std::sin(static_cast<float>(index) * 0.073f);
     times.clear();
     for (int pass = 0; pass < iterations; ++pass) {
-        transport.push(input.data(), frames * 2);
+        transport.push(input);
         const auto start = std::chrono::steady_clock::now();
-        transport.render(samples.data(), frames);
+        transport.render(samples);
         const auto stop = std::chrono::steady_clock::now();
         times.push_back(std::chrono::duration<double, std::micro>(stop - start).count());
         checksum += samples[0];
     }
     double sum = 0;
-    for (double time : times) sum += time;
+    for (double time : times)
+        sum += time;
     std::sort(times.begin(), times.end());
     std::cout << "Transport 96000 -> 48000 Hz: 128 output frames; mean " << sum / iterations
-              << " us; p99 " << times[iterations * 99 / 100] << " us; max " << times.back() << " us\n";
+              << " us; p99 " << times[iterations * 99 / 100] << " us; max " << times.back()
+              << " us\n";
     std::cout << "Checksum: " << checksum << '\n';
 }

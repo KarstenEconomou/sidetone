@@ -6,10 +6,7 @@ extern "C" {
 #endif
 
 typedef struct STEngine STEngine;
-enum {
-    ST_RESTART_IO = 1 << 0,
-    ST_RESTART_OUTPUT_ROUTE = 1 << 1
-};
+enum { ST_RESTART_IO = 1 << 0, ST_RESTART_OUTPUT_ROUTE = 1 << 1 };
 typedef struct {
     uint32_t id;
     char uid[256];
@@ -24,7 +21,7 @@ typedef struct {
     uint32_t isDefaultInput;
     uint32_t isDefaultOutput;
     uint32_t outputDataSource;
-    uint32_t outputJackState; /* 0 unknown, 1 disconnected, 2 connected. */
+    uint32_t outputJackState;   /* 0 unknown, 1 disconnected, 2 connected. */
     uint32_t outputLeftChannel; /* Effective output channels, numbered from zero. */
     uint32_t outputRightChannel;
 } STDevice;
@@ -76,17 +73,18 @@ typedef struct {
     double resamplerLatencyMs;
     uint64_t hardwareOverloads;
 } STTelemetry;
-uint32_t st_devices(STDevice *devices, uint32_t capacity);
+uint32_t st_devices(STDevice* devices, uint32_t capacity);
 uint64_t st_device_generation(void);
-STEngine *st_engine_create(void);
-void st_engine_destroy(STEngine *engine);
-int32_t st_engine_start(STEngine *engine, STConfiguration configuration);
+STEngine* st_engine_create(void);
+void st_engine_destroy(STEngine* engine);
+int32_t st_engine_start(STEngine* engine, STConfiguration configuration);
 /* Checks device UIDs, the output connection, and output channels before I/O. */
-int32_t st_engine_start_checked(STEngine *engine, STConfiguration configuration, STRouteIdentity identity);
-void st_engine_stop(STEngine *engine);
-void st_engine_set_parameters(STEngine *engine, STParameters parameters);
-STTelemetry st_engine_telemetry(STEngine *engine);
-const char *st_engine_error(STEngine *engine);
+int32_t st_engine_start_checked(STEngine* engine, STConfiguration configuration,
+                                STRouteIdentity identity);
+void st_engine_stop(STEngine* engine);
+void st_engine_set_parameters(STEngine* engine, STParameters parameters);
+STTelemetry st_engine_telemetry(STEngine* engine);
+const char* st_engine_error(STEngine* engine);
 #ifdef __cplusplus
 }
 #endif
