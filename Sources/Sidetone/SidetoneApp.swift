@@ -132,20 +132,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
                 Native macOS app for low-latency, real-time microphone monitoring through headphones.
 
                 Developer: @KarstenEconomou
-
-                GitHub Repository
+                Repository: KarstenEconomou/sidetone
                 """,
             attributes: [
                 .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                 .foregroundColor: NSColor.labelColor,
                 .paragraphStyle: paragraph,
             ])
+        for label in ["Developer:", "Repository:"] {
+            credits.addAttribute(
+                .foregroundColor, value: NSColor.secondaryLabelColor,
+                range: (credits.string as NSString).range(of: label))
+        }
         credits.addAttribute(
             .link, value: "https://github.com/KarstenEconomou",
             range: (credits.string as NSString).range(of: "@KarstenEconomou"))
         credits.addAttribute(
             .link, value: "https://github.com/KarstenEconomou/sidetone",
-            range: (credits.string as NSString).range(of: "GitHub Repository"))
+            range: (credits.string as NSString).range(of: "KarstenEconomou/sidetone"))
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
         NSApp.activate(ignoringOtherApps: true)
         popover.performClose(nil)
