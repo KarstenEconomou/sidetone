@@ -20,11 +20,12 @@ struct MetricRow: View {
     }
 
     var body: some View {
-        HStack {
-            Text(title).foregroundStyle(.secondary)
-            Spacer()
+        LabeledContent {
             Text(value).monospacedDigit()
-        }.font(.caption)
+        } label: {
+            Text(title).foregroundStyle(.secondary)
+        }
+        .font(.caption)
     }
 }
 
