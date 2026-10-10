@@ -7,7 +7,11 @@ public enum MonitorProfile: String, Codable, CaseIterable, Identifiable, Sendabl
 
     public var id: String { rawValue }
     var engineValue: UInt32 {
-        switch self { case .direct: 0; case .natural: 1; case .voice: 2 }
+        switch self {
+        case .direct: 0
+        case .natural: 1
+        case .voice: 2
+        }
     }
 }
 
@@ -32,9 +36,15 @@ public struct MonitorSettings: Codable, Equatable, Sendable {
         switch profile {
         case .direct: break
         case .natural:
-            highPassHz = 75; eqFrequencyHz = 2200; eqGainDB = 1.5; eqQ = 0.7
+            highPassHz = 75
+            eqFrequencyHz = 2200
+            eqGainDB = 1.5
+            eqQ = 0.7
         case .voice:
-            highPassHz = 110; eqFrequencyHz = 2800; eqGainDB = 3; eqQ = 0.8
+            highPassHz = 110
+            eqFrequencyHz = 2800
+            eqGainDB = 3
+            eqQ = 0.8
         }
     }
 
@@ -50,8 +60,16 @@ public struct MonitorSettings: Codable, Equatable, Sendable {
         if outputUID?.isEmpty == true { outputUID = nil }
     }
 
-    private static func clamp(_ value: Double, _ range: ClosedRange<Double>, fallback: Double) -> Double {
+    private static func clamp(_ value: Double, _ range: ClosedRange<Double>, fallback: Double)
+        -> Double
+    {
         value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
+    }
+
+    public func normalized() -> Self {
+        var result = self
+        result.normalize()
+        return result
     }
 }
 
@@ -63,16 +81,16 @@ public final class SettingsStore {
 
     public func load() -> MonitorSettings {
         guard let data = defaults.data(forKey: key),
-              var settings = try? JSONDecoder().decode(MonitorSettings.self, from: data) else {
+            let settings = try? JSONDecoder().decode(MonitorSettings.self, from: data)
+        else {
             return MonitorSettings()
         }
-        settings.normalize()
-        return settings
+        return settings.normalized()
     }
 
     public func save(_ settings: MonitorSettings) {
-        var safeSettings = settings
-        safeSettings.normalize()
-        if let data = try? JSONEncoder().encode(safeSettings) { defaults.set(data, forKey: key) }
+        if let data = try? JSONEncoder().encode(settings.normalized()) {
+            defaults.set(data, forKey: key)
+        }
     }
 }

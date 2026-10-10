@@ -27,7 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem = item
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Sidetone")
+            button.image = NSImage(
+                systemSymbolName: "waveform", accessibilityDescription: "Sidetone")
             button.target = self
             button.action = #selector(togglePopover)
             button.toolTip = "Sidetone — Off"
@@ -43,15 +44,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 self?.statusItem?.button?.image = NSImage(
                     systemSymbolName: active ? "waveform.circle.fill" : "waveform",
                     accessibilityDescription: active ? "Sidetone is on" : "Sidetone is off")
-                self?.statusItem?.button?.toolTip = active ? "Sidetone — Monitoring" : "Sidetone — Off"
+                self?.statusItem?.button?.toolTip =
+                    active ? "Sidetone — Monitoring" : "Sidetone — Off"
             }
         }.store(in: &subscriptions)
         model.$settings.map(\.globalShortcut).removeDuplicates().sink { [weak self] enabled in
             MainActor.assumeIsolated { self?.configureShortcut(enabled) }
         }.store(in: &subscriptions)
         let center = NSWorkspace.shared.notificationCenter
-        center.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
-        center.addObserver(self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
+        center.addObserver(
+            self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification,
+            object: nil)
+        center.addObserver(
+            self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
         if !UserDefaults.standard.bool(forKey: "hasShownMenu") {
             togglePopover()
             UserDefaults.standard.set(true, forKey: "hasShownMenu")
@@ -59,15 +64,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func togglePopover() {
-        if popover.isShown { popover.performClose(nil) }
-        else if let button = statusItem?.button {
+        if popover.isShown {
+            popover.performClose(nil)
+        } else if let button = statusItem?.button {
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKey()
         }
     }
 
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)
+        -> Bool
+    {
         if !popover.isShown { togglePopover() }
         return true
     }

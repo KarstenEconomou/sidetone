@@ -6,6 +6,10 @@ extern "C" {
 #endif
 
 typedef struct STEngine STEngine;
+enum {
+    ST_RESTART_IO = 1 << 0,
+    ST_RESTART_OUTPUT_ROUTE = 1 << 1
+};
 typedef struct {
     uint32_t id;
     char uid[256];

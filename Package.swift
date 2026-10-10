@@ -6,22 +6,28 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .executable(name: "Sidetone", targets: ["Sidetone"]),
-        .executable(name: "SidetoneProbe", targets: ["SidetoneProbe"])
+        .executable(name: "SidetoneProbe", targets: ["SidetoneProbe"]),
     ],
     targets: [
         .target(
             name: "AudioCore",
             publicHeadersPath: "include",
             cxxSettings: [.unsafeFlags(["-Wall", "-Wextra", "-Werror"])],
-            linkerSettings: [.linkedFramework("CoreAudio"), .linkedFramework("AudioToolbox"), .linkedFramework("CoreFoundation")]
+            linkerSettings: [
+                .linkedFramework("CoreAudio"), .linkedFramework("AudioToolbox"),
+                .linkedFramework("CoreFoundation"),
+            ]
         ),
-        .target(name: "SidetoneKit", dependencies: ["AudioCore"],
-                swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
-        .executableTarget(name: "Sidetone", dependencies: ["SidetoneKit"],
-                          swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
-        .executableTarget(name: "SidetoneProbe", dependencies: ["AudioCore"],
-                          swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
-        .testTarget(name: "SidetoneKitTests", dependencies: ["SidetoneKit"])
+        .target(
+            name: "SidetoneKit", dependencies: ["AudioCore"],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
+        .executableTarget(
+            name: "Sidetone", dependencies: ["SidetoneKit"],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
+        .executableTarget(
+            name: "SidetoneProbe", dependencies: ["AudioCore"],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
+        .testTarget(name: "SidetoneKitTests", dependencies: ["SidetoneKit"]),
     ],
     cxxLanguageStandard: .cxx20
 )

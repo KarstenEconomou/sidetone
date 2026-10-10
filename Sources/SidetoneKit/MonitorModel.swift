@@ -1,5 +1,5 @@
-import AppKit
 import AVFoundation
+import AppKit
 import Combine
 import Foundation
 import ServiceManagement
@@ -29,22 +29,27 @@ public final class MonitorModel: ObservableObject {
     private var meterTask: Task<Void, Never>?
     private var sleeping = false
     private var closed = false
-    private var popoverVisible = false
     private var isPolling = false
     private var pollWaiters: [CheckedContinuation<Void, Never>] = []
     private var permissionGranted = false
 
     public convenience init(store: SettingsStore = SettingsStore()) {
-        self.init(store: store, worker: AudioWorker(), requestPermission: {
-            let permission = AVCaptureDevice.authorizationStatus(for: .audio)
-            if permission == .notDetermined { return await AVCaptureDevice.requestAccess(for: .audio) }
-            return permission == .authorized
-        })
+        self.init(
+            store: store, worker: AudioWorker(),
+            requestPermission: {
+                let permission = AVCaptureDevice.authorizationStatus(for: .audio)
+                if permission == .notDetermined {
+                    return await AVCaptureDevice.requestAccess(for: .audio)
+                }
+                return permission == .authorized
+            })
     }
 
-    init(store: SettingsStore, worker: any AudioWorking,
-         requestPermission: @escaping @MainActor () async -> Bool,
-         now: @escaping @MainActor () -> Date = { Date() }, startPolling: Bool = true) {
+    init(
+        store: SettingsStore, worker: any AudioWorking,
+        requestPermission: @escaping @MainActor () async -> Bool,
+        now: @escaping @MainActor () -> Date = { Date() }, startPolling: Bool = true
+    ) {
         self.store = store
         self.worker = worker
         self.requestPermission = requestPermission
@@ -54,6 +59,7 @@ public final class MonitorModel: ObservableObject {
         refreshLoginStatus()
         deviceTask = Task { [weak self] in
             while !Task.isCancelled {
+                guard self != nil else { return }
                 await self?.pollDevices()
                 try? await Task.sleep(for: .seconds(1))
             }
@@ -99,7 +105,9 @@ public final class MonitorModel: ObservableObject {
                 self.resumeRoute = self.route
                 self.startCurrentRoute(recovering: false)
             }
-        } else { stop() }
+        } else {
+            stop()
+        }
     }
 
     public func updateSettings(_ update: (inout MonitorSettings) -> Void) {
@@ -113,7 +121,9 @@ public final class MonitorModel: ObservableObject {
         store.save(next)
         if previous.inputUID != next.inputUID || previous.outputUID != next.outputUID {
             stop(message: "Device selected. Turn on Sidetone when ready.")
-        } else if previous.bufferFrames != next.bufferFrames || previous.inputChannel != next.inputChannel {
+        } else if previous.bufferFrames != next.bufferFrames
+            || previous.inputChannel != next.inputChannel
+        {
             recovery.reset()
             if enabled && !sleeping && permissionGranted { startCurrentRoute(recovering: true) }
         } else {
@@ -122,7 +132,6 @@ public final class MonitorModel: ObservableObject {
     }
 
     public func setPopoverVisible(_ visible: Bool) {
-        popoverVisible = visible
         meterTask?.cancel()
         meterTask = nil
         if visible {
@@ -130,11 +139,8 @@ public final class MonitorModel: ObservableObject {
             Task { await pollDevices(force: true) }
             meterTask = Task { [weak self] in
                 while !Task.isCancelled {
-                    guard let self else { return }
-                    if self.enabled && self.phase == .monitoring {
-                        let value = await self.worker.metrics()
-                        if self.phase == .monitoring { self.metrics = value }
-                    }
+                    guard self != nil else { return }
+                    await self?.refreshMetrics()
                     try? await Task.sleep(for: .milliseconds(100))
                 }
             }
@@ -149,11 +155,7 @@ public final class MonitorModel: ObservableObject {
             return
         }
         phase = .sleeping
-        revision &+= 1
-        let request = revision
-        let settings = settings
-        let parameters = parameterRevision
-        Task { _ = await worker.apply(route: nil, settings: settings, revision: request, parameterRevision: parameters) }
+        stopAudio()
     }
 
     public func systemDidWake() {
@@ -162,20 +164,17 @@ public final class MonitorModel: ObservableObject {
         Task {
             await pollDevices(force: true, handleRecovery: false)
             guard enabled, !sleeping else { return }
-            if route == nil {
-                phase = .waiting
-            } else if RouteSelection.canResume(previous: resumeRoute, next: route) {
-                startCurrentRoute(recovering: true)
-            } else {
-                stop(message: "The audio route changed. Check the output, then turn on Sidetone.")
-            }
+            startCurrentRoute(recovering: true)
         }
     }
 
     public func setLaunchAtLogin(_ value: Bool) {
         do {
-            if value { try SMAppService.mainApp.register() }
-            else { try SMAppService.mainApp.unregister() }
+            if value {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
             refreshLoginStatus()
         } catch {
             message = "Could not change launch at login: \(error.localizedDescription)"
@@ -184,7 +183,9 @@ public final class MonitorModel: ObservableObject {
     }
 
     public func openMicrophoneSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+        if let url = URL(
+            string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+        {
             NSWorkspace.shared.open(url)
         }
     }
@@ -193,46 +194,36 @@ public final class MonitorModel: ObservableObject {
 
     public func reportError(_ error: String) { message = error }
 
-    public func copyDiagnostics() {
-        let text = """
-        Sidetone diagnostics
-        State: \(status)
-        Input: \(route?.input.name ?? "Unavailable")
-        Output: \(route?.output.name ?? "Unavailable")
-        Profile: \(settings.profile.rawValue)
-        Gain: \(String(format: "%.1f", settings.gainDB)) dB
-        Input: \(Int(metrics.inputRate)) Hz / \(metrics.inputFrames) frames
-        Output: \(Int(metrics.outputRate)) Hz / \(metrics.outputFrames) frames
-        Estimated latency: \(String(format: "%.2f", metrics.estimatedLatencyMs)) ms
-        Device input latency: \(String(format: "%.2f", metrics.inputDeviceLatencyMs)) ms
-        Device output latency: \(String(format: "%.2f", metrics.outputDeviceLatencyMs)) ms
-        Input buffer duration: \(String(format: "%.2f", metrics.inputRate > 0 ? Double(metrics.inputFrames) / metrics.inputRate * 1000 : 0)) ms
-        Output buffer duration: \(String(format: "%.2f", metrics.outputRate > 0 ? Double(metrics.outputFrames) / metrics.outputRate * 1000 : 0)) ms
-        Queue latency: \(String(format: "%.2f", metrics.queueLatencyMs)) ms
-        Resampler latency: \(String(format: "%.2f", metrics.resamplerLatencyMs)) ms
-        Maximum callback: \(String(format: "%.3f", metrics.maxCallbackMs)) ms
-        Maximum DSP: \(String(format: "%.3f", metrics.maxDSPMs)) ms
-        Clock correction: \(String(format: "%.1f", metrics.driftPPM)) ppm
-        Input callbacks: \(metrics.inputCallbacks)
-        Output callbacks: \(metrics.outputCallbacks)
-        Underruns: \(metrics.underruns)
-        Overruns: \(metrics.overruns)
-        Callback overruns: \(metrics.deadlineMisses)
-        Hardware overloads: \(metrics.hardwareOverloads)
-        Protected samples: \(metrics.clippedSamples)
-        """
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
-
     public func shutdown() async {
         closed = true
         enabled = false
         permissionGranted = false
-        deviceTask?.cancel(); meterTask?.cancel()
-        deviceTask = nil; meterTask = nil
+        deviceTask?.cancel()
+        meterTask?.cancel()
+        deviceTask = nil
+        meterTask = nil
+        _ = await stopAudio().value
+    }
+
+    private func nextRequest(route: AudioRoute?) -> AudioRequest {
         revision &+= 1
-        _ = await worker.apply(route: nil, settings: settings, revision: revision, parameterRevision: parameterRevision)
+        return AudioRequest(
+            route: route, settings: settings, revision: revision,
+            parameterRevision: parameterRevision)
+    }
+
+    @discardableResult
+    private func stopAudio() -> Task<EngineResult, Never> {
+        let request = nextRequest(route: nil)
+        return Task { [worker] in await worker.apply(request) }
+    }
+
+    private func refreshMetrics() async {
+        guard enabled, phase == .monitoring else { return }
+        let request = revision
+        let value = await worker.metrics()
+        guard phase == .monitoring, revision == request else { return }
+        metrics = value
     }
 
     private func refreshLoginStatus() {
@@ -248,12 +239,10 @@ public final class MonitorModel: ObservableObject {
         self.message = message
         resumeRoute = nil
         recovery.reset()
-        revision &+= 1
-        let request = revision
-        let settings = settings
-        let parameters = parameterRevision
-        metrics.peakInput = 0; metrics.peakOutput = 0; metrics.running = false
-        Task { _ = await worker.apply(route: nil, settings: settings, revision: request, parameterRevision: parameters) }
+        metrics.peakInput = 0
+        metrics.peakOutput = 0
+        metrics.running = false
+        stopAudio()
     }
 
     private func startCurrentRoute(recovering: Bool) {
@@ -261,11 +250,7 @@ public final class MonitorModel: ObservableObject {
         guard let route else {
             phase = .waiting
             message = "The selected device or input channel is unavailable."
-            revision &+= 1
-            let request = revision
-            let settings = settings
-            let parameters = parameterRevision
-            Task { _ = await worker.apply(route: nil, settings: settings, revision: request, parameterRevision: parameters) }
+            stopAudio()
             return
         }
         if recovering && !RouteSelection.canResume(previous: resumeRoute, next: route) {
@@ -280,20 +265,19 @@ public final class MonitorModel: ObservableObject {
         resumeRoute = route
         phase = .starting
         message = nil
-        revision &+= 1
-        let request = revision
-        let settings = settings
-        let parameters = parameterRevision
+        let request = nextRequest(route: route)
         Task {
-            let result = await worker.apply(route: route, settings: settings, revision: request, parameterRevision: parameters)
-            guard revision == request, enabled, !closed else { return }
+            let result = await worker.apply(request)
+            guard revision == request.revision, enabled, !closed else { return }
             if result.running {
                 phase = .monitoring
                 recovery.reset()
             } else {
                 phase = .waiting
                 recovery.recordFailure(now: now())
-                message = (result.error ?? "The audio engine could not start.") + " Sidetone will try again."
+                message =
+                    (result.error ?? "The audio engine could not start.")
+                    + " Sidetone will try again."
             }
         }
     }
@@ -312,14 +296,19 @@ public final class MonitorModel: ObservableObject {
             for waiter in waiters { waiter.resume() }
         }
         let request = revision
-        let update = await worker.poll(generation: force ? nil : generation,
-                                       includeMetrics: enabled && !sleeping)
+        let update = await worker.poll(
+            generation: force ? nil : generation,
+            includeMetrics: enabled && !sleeping)
         guard !closed else { return }
         generation = update.generation
         if let devices = update.devices { self.devices = devices }
-        if let metrics = update.metrics, phase == .monitoring { self.metrics = metrics }
-        guard handleRecovery, enabled, permissionGranted, !sleeping, revision == request, phase != .starting else { return }
-        if let metrics = update.metrics, metrics.needsRestart & 2 != 0 {
+        if let metrics = update.metrics, phase == .monitoring, revision == request {
+            self.metrics = metrics
+        }
+        guard handleRecovery, enabled, permissionGranted, !sleeping, revision == request,
+            phase != .starting
+        else { return }
+        if let metrics = update.metrics, metrics.restartReasons.contains(.outputRoute) {
             stop(message: "The output changed. Check your headphones, then turn on Sidetone.")
             return
         }
@@ -327,14 +316,15 @@ public final class MonitorModel: ObservableObject {
             if phase != .waiting {
                 phase = .waiting
                 message = "Waiting for the selected audio device."
-                revision &+= 1
-                _ = await worker.apply(route: nil, settings: settings, revision: revision, parameterRevision: parameterRevision)
+                _ = await stopAudio().value
             }
             return
         }
-        if let previous = resumeRoute, !previous.hasSameDevices(as: next) {
+        if let previous = resumeRoute, !previous.hasSameIdentity(as: next) {
             stop(message: "The audio route changed. Check the output, then turn on Sidetone.")
-        } else if phase == .waiting || update.metrics?.needsRestart != 0 || update.metrics?.running == false {
+        } else if phase == .waiting || update.metrics?.restartReasons.isEmpty == false
+            || update.metrics?.running == false
+        {
             if recovery.canAttempt(now: now()) { startCurrentRoute(recovering: true) }
         }
     }
