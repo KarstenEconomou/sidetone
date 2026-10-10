@@ -156,7 +156,7 @@ AudioStreamBasicDescription clientFormat(double rate, UInt32 channels) {
     return format;
 }
 
-struct BufferChange { AudioDeviceID device{}; UInt32 previous{}, applied{}; };
+struct BufferChange { AudioDeviceID device{}; UInt32 previous{}, applied{}; char uid[256]{}; };
 struct Listener { AudioObjectID object{}; AudioObjectPropertyAddress property{}; };
 struct FreeList { void operator()(AudioBufferList *pointer) const noexcept { std::free(pointer); } };
 
@@ -342,7 +342,9 @@ struct STEngine {
         const UInt32 previous = device.bufferFrames;
         if (AudioObjectSetPropertyData(device.id, &property, 0, nullptr, sizeof(requested), &requested) == noErr) {
             readProperty(device.id, kAudioDevicePropertyBufferFrameSize, device.bufferFrames);
-            bufferChanges.push_back({device.id, previous, device.bufferFrames});
+            BufferChange change{device.id, previous, device.bufferFrames, {}};
+            std::memcpy(change.uid, device.uid, sizeof(change.uid));
+            bufferChanges.push_back(change);
         }
     }
 
@@ -401,6 +403,9 @@ struct STEngine {
             AudioObjectRemovePropertyListener(listener.object, &listener.property, propertyChanged, nullptr);
         listeners.clear();
         for (const auto &change : bufferChanges) {
+            char currentUID[256]{};
+            stringProperty(change.device, kAudioDevicePropertyDeviceUID, currentUID, sizeof(currentUID));
+            if (!currentUID[0] || std::strncmp(currentUID, change.uid, sizeof(currentUID)) != 0) continue;
             UInt32 current = 0;
             if (readProperty(change.device, kAudioDevicePropertyBufferFrameSize, current) && current == change.applied) {
                 auto property = address(kAudioDevicePropertyBufferFrameSize);
@@ -417,7 +422,25 @@ struct STEngine {
         outputPeak.store(0, std::memory_order_relaxed);
     }
 
-    bool start(STConfiguration requested) {
+    bool matchesRoute(const STDevice &currentInput, const STDevice &currentOutput,
+                      const STRouteIdentity &identity) {
+        if (!identity.inputUID[0] || std::strncmp(currentInput.uid, identity.inputUID, sizeof(identity.inputUID)) != 0) {
+            std::snprintf(error, sizeof(error), "The selected microphone identity changed. Select the microphone again.");
+            return false;
+        }
+        if (!identity.outputUID[0] || std::strncmp(currentOutput.uid, identity.outputUID, sizeof(identity.outputUID)) != 0) {
+            std::snprintf(error, sizeof(error), "The selected output identity changed. Select the output again.");
+            return false;
+        }
+        if (currentOutput.outputDataSource != identity.outputDataSource ||
+            currentOutput.outputJackState != identity.outputJackState) {
+            std::snprintf(error, sizeof(error), "The output connection changed. Check the headphones and start monitoring again.");
+            return false;
+        }
+        return true;
+    }
+
+    bool start(STConfiguration requested, const STRouteIdentity *identity = nullptr) {
         stop();
         error[0] = '\0';
         callbackError.store(noErr, std::memory_order_relaxed);
@@ -431,6 +454,7 @@ struct STEngine {
         if (!describeDevice(configuration.outputDevice, output) || !output.outputChannels) {
             std::snprintf(error, sizeof(error), "The selected audio output is not available."); return false;
         }
+        if (identity && !matchesRoute(input, output, *identity)) return false;
         if (input.inputChannels > maximumChannels || output.outputChannels > maximumChannels ||
             input.sampleRate < 8000 || input.sampleRate > 768000 || output.sampleRate < 8000 || output.sampleRate > 768000 ||
             !std::isfinite(input.sampleRate) || !std::isfinite(output.sampleRate)) {
@@ -489,8 +513,11 @@ struct STEngine {
             if (!makeUnit(inputUnit, input.id, true, false) || !makeUnit(outputUnit, output.id, false, true)) return false;
         }
         STDevice currentInput{}, currentOutput{};
-        if (!describeDevice(input.id, currentInput) || !describeDevice(output.id, currentOutput) ||
-            currentInput.inputChannels != input.inputChannels || currentOutput.outputChannels != output.outputChannels ||
+        if (!describeDevice(input.id, currentInput) || !describeDevice(output.id, currentOutput)) {
+            std::snprintf(error, sizeof(error), "The audio device is no longer available. Select the devices again."); return false;
+        }
+        if (identity && !matchesRoute(currentInput, currentOutput, *identity)) return false;
+        if (currentInput.inputChannels != input.inputChannels || currentOutput.outputChannels != output.outputChannels ||
             currentInput.sampleRate != input.sampleRate || currentOutput.sampleRate != output.sampleRate ||
             currentInput.bufferFrames != input.bufferFrames || currentOutput.bufferFrames != output.bufferFrames) {
             std::snprintf(error, sizeof(error), "The audio device changed during setup. Start monitoring again."); return false;
@@ -582,6 +609,14 @@ int32_t st_engine_start(STEngine *engine, STConfiguration configuration) {
     if (!engine) return -1;
     try {
         if (engine->start(configuration)) return 0;
+    } catch (...) { std::snprintf(engine->error, sizeof(engine->error), "The audio engine could not allocate its buffers."); }
+    engine->stop();
+    return -1;
+}
+int32_t st_engine_start_checked(STEngine *engine, STConfiguration configuration, STRouteIdentity identity) {
+    if (!engine) return -1;
+    try {
+        if (engine->start(configuration, &identity)) return 0;
     } catch (...) { std::snprintf(engine->error, sizeof(engine->error), "The audio engine could not allocate its buffers."); }
     engine->stop();
     return -1;

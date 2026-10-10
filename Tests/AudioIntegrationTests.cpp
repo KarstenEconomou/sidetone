@@ -21,6 +21,7 @@ int main() {
     st_engine_destroy(nullptr);
     st_engine_set_parameters(nullptr, {});
     require(st_engine_start(nullptr, {}) != 0, "A null engine must reject start.");
+    require(st_engine_start_checked(nullptr, {}, {}) != 0, "A null engine must reject checked start.");
     require(st_engine_telemetry(nullptr).running == 0, "A null engine must not report running.");
     require(std::strlen(st_engine_error(nullptr)) > 0, "A null engine must supply an error.");
 
@@ -65,12 +66,45 @@ int main() {
                     "An unavailable microphone channel must reject start.");
             require(std::strstr(st_engine_error(engine), "channel") != nullptr,
                     "The failure must identify the unavailable channel.");
+
+            STRouteIdentity identity{};
+            std::memcpy(identity.inputUID, input->uid, sizeof(identity.inputUID));
+            std::memcpy(identity.outputUID, output->uid, sizeof(identity.outputUID));
+            identity.outputDataSource = output->outputDataSource;
+            identity.outputJackState = output->outputJackState;
+            const STConfiguration selected{input->id, output->id, 0, 64};
+            const auto rejectIdentity = [&](STRouteIdentity changed, const char *error) {
+                require(st_engine_start_checked(engine, selected, changed) != 0,
+                        "A changed device identity or output connection must reject start.");
+                require(std::strstr(st_engine_error(engine), error) != nullptr,
+                        "Checked start must identify the changed device or connection.");
+                const auto telemetry = st_engine_telemetry(engine);
+                require(!telemetry.running && !telemetry.inputCallbacks && !telemetry.outputCallbacks,
+                        "A changed route must not capture or play audio.");
+            };
+            auto changed = identity;
+            std::memset(changed.inputUID, 'X', sizeof(changed.inputUID));
+            rejectIdentity(changed, "microphone identity");
+            changed = identity;
+            std::memset(changed.outputUID, 'X', sizeof(changed.outputUID));
+            rejectIdentity(changed, "output identity");
+            changed = identity;
+            changed.outputDataSource ^= 1;
+            rejectIdentity(changed, "output connection");
+            changed = identity;
+            changed.outputJackState = identity.outputJackState == 0 ? 2 : 0;
+            rejectIdentity(changed, "output connection");
+            rejectIdentity({}, "microphone identity");
+            require(st_engine_start_checked(engine, {input->id, output->id, input->inputChannels, 64}, identity) != 0,
+                    "A matching route must still reject an unavailable channel.");
+            require(std::strstr(st_engine_error(engine), "channel") != nullptr,
+                    "A matching route must pass identity checks before channel validation.");
         }
         require(!st_engine_telemetry(engine).running, "Invalid device settings must leave capture stopped.");
         st_engine_destroy(engine);
     }
     std::printf("Audio lifecycle tests passed: 1000 failed starts, repeated stop, null API, bounded enumeration.");
-    if (input != devices.end()) std::printf(" Unavailable output and channel checks used current devices.");
+    if (input != devices.end()) std::printf(" Unavailable output, channel, and changed-route checks used current devices.");
     else std::printf(" Device-dependent checks skipped: no input device is visible.");
     std::printf("\n");
     return 0;

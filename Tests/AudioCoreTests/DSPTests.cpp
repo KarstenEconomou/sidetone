@@ -105,6 +105,26 @@ void testProfiles() {
     const double directDry = response({0, 0, 75, 1500, 0, 0.7f, 0}, 1000, 0.5);
     require(std::abs(directDry - directCompressed) < 1.0e-6, "Direct has no EQ or compression");
 }
+void testEQRateChanges() {
+    sidetone::DSP dsp;
+    dsp.prepare(8000);
+    dsp.setParameters({0, 1, 75, 10000, 6, 2.0f, 0});
+    for (const double rate : {48000.0, 8000.0, 96000.0}) {
+        dsp.prepare(rate);
+        const double frequency = std::min(10000.0, rate * 0.45);
+        double inputEnergy = 0, outputEnergy = 0;
+        for (int index = 0; index < static_cast<int>(rate); ++index) {
+            const float input = static_cast<float>(0.03 * std::sin(2.0 * std::numbers::pi * frequency * index / rate));
+            const float output = dsp.process(input);
+            if (index >= static_cast<int>(rate / 2)) {
+                inputEnergy += input * input;
+                outputEnergy += output * output;
+            }
+        }
+        require(std::abs(10.0 * std::log10(outputEnergy / inputEnergy) - 6) < 0.15,
+                "EQ keeps its selected frequency across sample-rate changes");
+    }
+}
 void testProfileTransitions() {
     sidetone::DSP dsp;
     dsp.prepare(48000);
@@ -257,6 +277,20 @@ void testStartupAndRecovery() {
     }
     require(std::abs(samples.back() - 0.1f) < 0.001f, "transport recovers from an input outage");
 }
+void testTransportCapacity() {
+    sidetone::AdaptiveTransport transport;
+    require(transport.supportsConfiguration(352800, 48000, 64, 16384), "a large output block fits the transport");
+    require(!transport.supportsConfiguration(768000, 8000, 64, 16384), "a block larger than transport capacity is rejected");
+    transport.prepare(352800, 48000, 64, 16384);
+    std::array<float, 64> input{};
+    input.fill(0.1f);
+    std::array<float, 16384> output{};
+    for (int block = 0; block < 2048; ++block) transport.push(input.data(), 64);
+    transport.render(output.data(), 16384);
+    require(transport.underruns() == 0 && transport.overruns() == 0,
+            "an accepted large output block renders without lost samples");
+    require(std::abs(output.back() - 0.1f) < 0.001f, "the full accepted output block contains audio");
+}
 }
 
 int main() {
@@ -265,10 +299,12 @@ int main() {
     testRingConcurrency();
     testTransportSafety();
     testProfiles();
+    testEQRateChanges();
     testProfileTransitions();
     testParameterConcurrency();
     testResampling();
     testDrift();
     testStartupAndRecovery();
+    testTransportCapacity();
     std::cout << "DSP, ring, and transport tests passed.\n";
 }

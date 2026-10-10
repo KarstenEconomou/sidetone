@@ -62,18 +62,20 @@ void DSP::setParameters(STParameters parameters) noexcept {
     parameters.gainDB = finiteRange(parameters.gainDB, -60, 6, -60);
     parameters.profile = std::min(parameters.profile, 2U);
     parameters.highPassHz = finiteRange(parameters.highPassHz, 20, 300, 75);
-    parameters.eqFrequencyHz = finiteRange(parameters.eqFrequencyHz, 80, static_cast<float>(std::min(16000.0, sampleRate_ * 0.45)), 1800);
+    parameters.eqFrequencyHz = finiteRange(parameters.eqFrequencyHz, 80, 16000, 1800);
     parameters.eqGainDB = finiteRange(parameters.eqGainDB, -12, 12, 0);
     parameters.eqQ = finiteRange(parameters.eqQ, 0.2f, 4.0f, 0.7f);
     requested_ = parameters;
+    const double frequency = std::min(static_cast<double>(parameters.eqFrequencyHz), sampleRate_ * 0.45);
     const std::array<std::array<double, 5>, 5> filters{
         highPass(sampleRate_, parameters.highPassHz),
-        peak(sampleRate_, parameters.eqFrequencyHz, parameters.eqGainDB, parameters.eqQ),
+        peak(sampleRate_, frequency, parameters.eqGainDB, parameters.eqQ),
         highPass(sampleRate_, std::max(110.0f, parameters.highPassHz)),
-        peak(sampleRate_, parameters.eqFrequencyHz, std::clamp(parameters.eqGainDB + 3.0f, -12.0f, 12.0f), parameters.eqQ),
+        peak(sampleRate_, frequency, std::clamp(parameters.eqGainDB + 3.0f, -12.0f, 12.0f), parameters.eqQ),
         peak(sampleRate_, 350.0, -2.0, 0.7)
     };
     revision_.fetch_add(1, std::memory_order_acq_rel);
+    std::atomic_thread_fence(std::memory_order_release);
     for (std::size_t filter = 0; filter < filters.size(); ++filter)
         for (std::size_t coefficient = 0; coefficient < 5; ++coefficient)
             coefficients_[filter * 5 + coefficient].store(filters[filter][coefficient], std::memory_order_relaxed);
@@ -161,9 +163,9 @@ void AdaptiveTransport::prepare(double inputRate, double outputRate,
     outputRate_ = safeRate(outputRate);
     ratio_ = inputRate_ / outputRate_;
     const double sourceOutputFrames = outputBufferFrames * ratio_;
-    targetFrames_ = std::clamp(sourceOutputFrames + inputBufferFrames * 0.5 + std::max(16.0, inputRate_ * 0.002), 4.0, 120000.0);
-    startupFrames_ = std::min(125000.0, targetFrames_ + inputBufferFrames * 0.5 + 2.0);
-    maximumFrames_ = std::min(130000.0, targetFrames_ + std::max(4.0 * inputBufferFrames, inputRate_ * 0.020));
+    targetFrames_ = sourceOutputFrames + inputBufferFrames * 0.5 + std::max(16.0, inputRate_ * 0.002);
+    startupFrames_ = targetFrames_ + inputBufferFrames * 0.5 + 2.0;
+    maximumFrames_ = targetFrames_ + std::max(4.0 * inputBufferFrames, inputRate_ * 0.020);
     tapCount_ = static_cast<std::size_t>(std::clamp(32.0 * std::ceil(std::max(1.0, ratio_)), 32.0, static_cast<double>(maxTaps)));
     kernel_.resize((phases + 1) * tapCount_);
     const double cutoff = 0.46 / std::max(1.0, ratio_ * 1.003);

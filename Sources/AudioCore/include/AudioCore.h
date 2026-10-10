@@ -29,6 +29,12 @@ typedef struct {
     uint32_t bufferFrames;
 } STConfiguration;
 typedef struct {
+    char inputUID[256];
+    char outputUID[256];
+    uint32_t outputDataSource;
+    uint32_t outputJackState;
+} STRouteIdentity;
+typedef struct {
     float gainDB;
     uint32_t profile; /* 0 Direct, 1 Natural, 2 Voice. */
     float highPassHz;
@@ -67,6 +73,8 @@ uint64_t st_device_generation(void);
 STEngine *st_engine_create(void);
 void st_engine_destroy(STEngine *engine);
 int32_t st_engine_start(STEngine *engine, STConfiguration configuration);
+/* Checks both device UIDs and the output connection before capture and playback. */
+int32_t st_engine_start_checked(STEngine *engine, STConfiguration configuration, STRouteIdentity identity);
 void st_engine_stop(STEngine *engine);
 void st_engine_set_parameters(STEngine *engine, STParameters parameters);
 STTelemetry st_engine_telemetry(STEngine *engine);
