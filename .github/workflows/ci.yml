@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: python3 Scripts/version.py title "$PR_TITLE"
+      - name: Check version
+        run: python3 Scripts/version.py check
+      - name: Test release versions
+        run: python3 -m unittest discover -s Tests -p '*ReleaseTests.py'
+      - name: Check Swift format
+        run: xcrun swift-format lint --strict --recursive Sources Tests/SidetoneKitTests Scripts/icon.swift
+      - name: Run tests
+        run: Scripts/test.sh
+      - name: Build universal app
+        env:
+          BUILD_ARCHITECTURES: arm64 x86_64
+        run: Scripts/build.sh

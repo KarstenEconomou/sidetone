@@ -8,8 +8,24 @@ package_app() (
     display_name="$4"
     icon="${5:-}"
     configuration="${CONFIGURATION:-release}"
-    swift build -c "$configuration" --product "$product"
-    binary_path="$(swift build -c "$configuration" --show-bin-path)"
+    version="$(python3 Scripts/version.py current)"
+    build_number="${BUILD_NUMBER:-1}"
+    if [[ ! "$build_number" =~ ^[1-9][0-9]*$ ]]; then
+        printf 'BUILD_NUMBER must be a positive integer.\n' >&2
+        exit 1
+    fi
+    read -r -a architectures <<< "${BUILD_ARCHITECTURES:-$(uname -m)}"
+    binaries=()
+    for architecture in "${architectures[@]}"; do
+        case "$architecture" in
+            arm64|x86_64) ;;
+            *) printf 'Unsupported architecture: %s\n' "$architecture" >&2; exit 1 ;;
+        esac
+        build_flags=(-c "$configuration" --triple "$architecture-apple-macosx13.0")
+        swift build "${build_flags[@]}" --product "$product"
+        binary_path="$(swift build "${build_flags[@]}" --show-bin-path)"
+        binaries+=("$binary_path/$product")
+    done
     output_dir="$(dirname "$app_path")"
     mkdir -p "$output_dir"
     staging="$(mktemp -d "$output_dir/.sidetone.XXXXXX")"
@@ -22,13 +38,16 @@ package_app() (
     trap cleanup EXIT
     bundle_path="$staging/$product.app"
     mkdir -p "$bundle_path/Contents/MacOS" "$bundle_path/Contents/Resources"
-    cp "$binary_path/$product" "$bundle_path/Contents/MacOS/$product"
+    xcrun lipo -create "${binaries[@]}" -output "$bundle_path/Contents/MacOS/$product"
+    cp LICENSE "$bundle_path/Contents/Resources/License.txt"
     plist="$bundle_path/Contents/Info.plist"
     cp Resources/Info.plist "$plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $product" "$plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $bundle_id" "$plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleName $display_name" "$plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $display_name" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string $version" "$plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $build_number" "$plist"
     if [[ -n "$icon" && -f "Resources/$icon" ]]; then
         cp "Resources/$icon" "$bundle_path/Contents/Resources/$icon"
         /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile ${icon%.*}" "$plist"
