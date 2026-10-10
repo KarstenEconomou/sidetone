@@ -1,113 +1,125 @@
-import AudioCore
 import AVFoundation
+import AudioCore
 import Foundation
 
-func fixedString<T>(_ value: T) -> String {
-    withUnsafeBytes(of: value) { bytes in
-        String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
-    }
-}
-
-@main struct Probe {
+@main
+struct Probe {
     static func main() async {
-        let args = Array(CommandLine.arguments.dropFirst())
-        if args.contains("--help") {
-            print("""
-            SidetoneProbe [--run --input ID --output ID] [--seconds 10] [--cycles 1]
-                          [--frames 64] [--gain -60] [--profiles] [--log PATH]
-            With no arguments, list devices. --run captures the microphone and plays it
-            through the selected output. Gain is limited to -60 through -12 dB.
-            Audio is never saved. --log saves only numeric diagnostic values.
-            """)
-            return
+        let options: ProbeOptions
+        let log: FileHandle?
+        do {
+            options = try ProbeOptions(arguments: Array(CommandLine.arguments.dropFirst()))
+            if options.help {
+                print(
+                    """
+                    SidetoneProbe [--run --input ID --output ID] [--seconds 10] [--cycles 1]
+                                  [--frames 64] [--gain -60] [--profiles] [--log PATH]
+                    With no arguments, list devices. --run captures the microphone and plays it
+                    through the selected output. Gain is limited to -60 through -12 dB.
+                    Audio is never saved. --log saves only numeric diagnostic values.
+                    """)
+                return
+            }
+            log = try openLog(path: options.logPath)
+        } catch {
+            print("ERROR: \(error.localizedDescription)")
+            exit(2)
         }
-        func option(_ name: String) -> String? {
-            guard let index = args.firstIndex(of: name), index + 1 < args.count else { return nil }
-            return args[index + 1]
-        }
-        let logURL = option("--log").map { URL(fileURLWithPath: $0) }
+        defer { try? log?.close() }
         func report(_ line: String) {
             print(line)
-            if let logURL {
-                let data = Data((line + "\n").utf8)
-                if !FileManager.default.fileExists(atPath: logURL.path) {
-                    _ = FileManager.default.createFile(atPath: logURL.path, contents: nil)
-                }
-                if let file = try? FileHandle(forWritingTo: logURL) {
-                    defer { try? file.close() }
-                    _ = try? file.seekToEnd()
-                    try? file.write(contentsOf: data)
-                }
-            }
+            try? log?.write(contentsOf: Data((line + "\n").utf8))
         }
-        var devices = [STDevice](repeating: STDevice(), count: 128)
-        let count = devices.withUnsafeMutableBufferPointer { st_devices($0.baseAddress, UInt32($0.count)) }
-        devices = Array(devices.prefix(Int(min(count, 128))))
-        for device in devices {
-            report("DEVICE id=\(device.id) name=\(fixedString(device.name)) input=\(device.inputChannels) output=\(device.outputChannels) rate=\(device.sampleRate) buffer=\(device.bufferFrames) range=\(device.minBufferFrames)...\(device.maxBufferFrames) uid=\(fixedString(device.uid))")
-        }
-        guard args.contains("--run") else { return }
-        guard let input = option("--input").flatMap(UInt32.init),
-              let output = option("--output").flatMap(UInt32.init),
-              devices.contains(where: { $0.id == input && $0.inputChannels > 0 }),
-              devices.contains(where: { $0.id == output && $0.outputChannels > 0 }) else {
+        let devices = availableDevices()
+        for device in devices { report(device.probeDescription) }
+        guard options.run else { return }
+        guard let inputID = options.inputID, let outputID = options.outputID,
+            let input = devices.first(where: { $0.id == inputID && $0.inputChannels > 0 }),
+            let output = devices.first(where: { $0.id == outputID && $0.outputChannels > 0 })
+        else {
             report("ERROR: Supply --input ID and --output ID from the device list.")
             exit(2)
         }
-        let permitted = await AVCaptureDevice.requestAccess(for: .audio)
-        guard permitted else { report("ERROR: Microphone permission is denied."); exit(3) }
-        guard let engine = st_engine_create() else { report("ERROR: Cannot create the engine."); exit(4) }
+        guard await AVCaptureDevice.requestAccess(for: .audio) else {
+            report("ERROR: Microphone permission is denied.")
+            exit(3)
+        }
+        guard let engine = st_engine_create() else {
+            report("ERROR: Cannot create the engine.")
+            exit(4)
+        }
         defer { st_engine_destroy(engine) }
-        let seconds = min(max(Double(option("--seconds") ?? "10") ?? 10, 1), 86400)
-        let cycles = min(max(Int(option("--cycles") ?? "1") ?? 1, 1), 1000)
-        let frames = UInt32(option("--frames") ?? "64") ?? 64
-        let gain = min(max(Float(option("--gain") ?? "-60") ?? -60, -60), -12)
-        let selectedInput = devices.first { $0.id == input }!
-        let selectedOutput = devices.first { $0.id == output }!
-        let identity = STRouteIdentity(inputUID: selectedInput.uid, outputUID: selectedOutput.uid,
-                                       outputDataSource: selectedOutput.outputDataSource,
-                                       outputJackState: selectedOutput.outputJackState,
-                                       outputLeftChannel: selectedOutput.outputLeftChannel,
-                                       outputRightChannel: selectedOutput.outputRightChannel)
-        var parameters = STParameters(gainDB: gain, profile: 0, highPassHz: 80,
-                                     eqFrequencyHz: 2200, eqGainDB: 0, eqQ: 0.7, compression: 0)
+        let identity = STRouteIdentity(
+            inputUID: input.uid, outputUID: output.uid,
+            outputDataSource: output.outputDataSource,
+            outputJackState: output.outputJackState,
+            outputLeftChannel: output.outputLeftChannel,
+            outputRightChannel: output.outputRightChannel)
+        let configuration = STConfiguration(
+            inputDevice: input.id, outputDevice: output.id,
+            inputChannel: 0, bufferFrames: options.frames)
+        var parameters = STParameters(
+            gainDB: options.gainDB, profile: 0, highPassHz: 80,
+            eqFrequencyHz: 2200, eqGainDB: 0, eqQ: 0.7, compression: 0)
         st_engine_set_parameters(engine, parameters)
+        let clock = ContinuousClock()
         var failed = false
-        for cycle in 1...cycles {
-            let config = STConfiguration(inputDevice: input, outputDevice: output,
-                                         inputChannel: 0, bufferFrames: frames)
-            guard st_engine_start_checked(engine, config, identity) == 0 else {
+        for cycle in 1...options.cycles {
+            guard st_engine_start_checked(engine, configuration, identity) == 0 else {
                 report("ERROR: \(String(cString: st_engine_error(engine)))")
                 failed = true
                 break
             }
-            let start = Date()
+            let start = clock.now
+            let deadline = start.advanced(by: .seconds(options.seconds))
             var previous = STTelemetry()
             repeat {
-                // Only the control task waits. Audio callbacks run on Core Audio threads.
-                try? await Task.sleep(for: .seconds(min(1, seconds)))
+                // Only the control task waits. Core Audio runs the audio callbacks.
+                try? await Task.sleep(for: .seconds(min(1, options.seconds)))
+                let elapsed = start.duration(to: clock.now).seconds
                 let value = st_engine_telemetry(engine)
-                report(String(format: "RUN cycle=%d time=%.1f rate=%.0f/%.0f frames=%u/%u callbacks=%llu/%llu underruns=%llu overruns=%llu deadlines=%llu clip=%llu input_peak=%.6f output_peak=%.6f estimated_ms=%.3f queue_ms=%.3f callback_max_ms=%.4f dsp_max_ms=%.4f drift_ppm=%.2f restart=%u hardware_overloads=%llu", cycle, Date().timeIntervalSince(start), value.inputRate, value.outputRate, value.inputBufferFrames, value.outputBufferFrames, value.inputCallbacks, value.outputCallbacks, value.underruns, value.overruns, value.deadlineMisses, value.clippedSamples, value.peakInput, value.peakOutput, value.estimatedLatencyMs, value.queueLatencyMs, value.maxCallbackMs, value.maxDSPMs, value.driftPPM, value.needsRestart, value.hardwareOverloads))
+                report(value.probeDescription(cycle: cycle, elapsed: elapsed))
                 if value.outputCallbacks <= previous.outputCallbacks || value.needsRestart != 0 {
                     failed = true
                 }
-                if Date().timeIntervalSince(start) > 2 &&
-                    (value.inputCallbacks <= previous.inputCallbacks ||
-                     value.underruns > previous.underruns || value.overruns > previous.overruns ||
-                     value.deadlineMisses > previous.deadlineMisses || value.hardwareOverloads > previous.hardwareOverloads) {
-                    failed = true
-                }
+                if elapsed > 2 && value.hasErrors(since: previous) { failed = true }
                 previous = value
-                if args.contains("--profiles") {
-                    parameters.profile = UInt32(Int(Date().timeIntervalSince(start)) % 3)
+                if options.profiles {
+                    parameters.profile = UInt32(Int(elapsed) % 3)
                     parameters.compression = parameters.profile == 2 ? 1 : 0
                     st_engine_set_parameters(engine, parameters)
                 }
-            } while Date().timeIntervalSince(start) < seconds
+            } while clock.now < deadline
             st_engine_stop(engine)
             if st_engine_telemetry(engine).running != 0 { failed = true }
         }
-        report(failed ? "FAIL: Inspect the diagnostic log." : "PASS: Audio callbacks and repeated start/stop completed.")
+        report(
+            failed
+                ? "FAIL: Inspect the diagnostic log."
+                : "PASS: Audio callbacks and repeated start/stop completed.")
         if failed { exit(5) }
+    }
+
+    private static func availableDevices() -> [STDevice] {
+        var devices = [STDevice](repeating: STDevice(), count: Int(st_devices(nil, 0)))
+        let count = devices.withUnsafeMutableBufferPointer {
+            st_devices($0.baseAddress, UInt32($0.count))
+        }
+        return Array(devices.prefix(min(Int(count), devices.count)))
+    }
+
+    private static func openLog(path: String?) throws -> FileHandle? {
+        guard let path else { return nil }
+        if !FileManager.default.fileExists(atPath: path) {
+            guard FileManager.default.createFile(atPath: path, contents: nil) else {
+                throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: path])
+            }
+        }
+        let file = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
+        do { try file.seekToEnd() } catch {
+            try? file.close()
+            throw error
+        }
+        return file
     }
 }

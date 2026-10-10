@@ -18,6 +18,9 @@ The build script creates a standalone app with a local code signature and the
 hardened runtime. The only entitlement is audio input. This signature supports
 local use. Public distribution requires a Developer ID Application certificate
 and a notarytool keychain profile.
+The app and probe scripts use one bundle function. It signs and checks a staged
+bundle before it replaces the destination. `CONFIGURATION` selects the build
+configuration. Its default is `release`.
 
 ```sh
 SIGNING_IDENTITY='Developer ID Application: NAME (TEAM)' \
@@ -33,12 +36,16 @@ Credentials stay in the keychain. The script does not create credentials.
 `Sidetone` contains the AppKit status item and the SwiftUI popover.
 `SidetoneKit` contains settings, route selection, permissions, and lifecycle
 control. The main actor owns the interface. An audio worker actor serializes
-all C engine calls. A request number prevents a stale start request from
-replacing a later stop request.
+all C engine calls. Each start or stop request contains an immutable route and
+settings snapshot. A request number prevents a stale start request from
+replacing a later stop request. A separate parameter number prevents stale
+gain or filter settings from replacing later settings.
 
 `AudioCore` owns the AUHAL units, sample buffers, DSP state, and telemetry.
 The control thread creates and initializes each audio unit before it starts.
 It stops and disposes the units before it releases the sample buffers.
+The engine destructor performs the same cleanup. DSP and transport functions
+use `std::span` to read or write caller-owned buffers.
 Device listeners hold no engine pointer. They change process-wide atomic
 counters. Thus, a delayed property notification cannot access a released engine.
 
@@ -186,8 +193,8 @@ reports, not physical loopback measurements. The 10-minute log does not include
 the hardware-overload counter.
 
 At 128 frames and 48 kHz, the DSP benchmark reports mean / 99th-percentile times
-of 0.80 / 0.92 microseconds for Direct, 5.09 / 5.79 for Natural, and
-5.13 / 6.33 for Voice. The 96-to-48 kHz transport reports 4.40 / 5.21
+of 1.61 / 2.29 microseconds for Direct, 5.08 / 7.71 for Natural, and
+4.60 / 4.83 for Voice. The 96-to-48 kHz transport reports 3.94 / 4.67
 microseconds. These isolated timings do not measure end-to-end latency.
 
 Live interface checks cover microphone permission, meters, profiles, gain,
