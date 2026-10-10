@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, such as 1.0.0
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create draft release
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check release source and version
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          git merge-base --is-ancestor HEAD origin/main
+          python3 Scripts/version.py release "$RELEASE_VERSION"
+      - name: Test release versions
+        run: python3 -m unittest discover -s Tests -p '*ReleaseTests.py'
+      - name: Run tests
+        run: Scripts/test.sh
+      - name: Build universal app
+        env:
+          BUILD_ARCHITECTURES: arm64 x86_64
+          BUILD_NUMBER: ${{ github.run_number }}
+          CONFIGURATION: release
+          SIGNING_IDENTITY: '-'
+        run: Scripts/build.sh
+      - name: Create archive and checksum
+        run: Scripts/archive.sh
+      - name: Create GitHub draft release
+        run: |
+          tag="v$RELEASE_VERSION"
+          archive="dist/Sidetone-$RELEASE_VERSION-macos-universal.zip"
+          if gh release view "$tag" --json isDraft,targetCommitish > "$RUNNER_TEMP/release.json"; then
+            test "$(jq -r .isDraft "$RUNNER_TEMP/release.json")" = true
+            test "$(jq -r .targetCommitish "$RUNNER_TEMP/release.json")" = "$GITHUB_SHA"
+            gh release upload "$tag" "$archive" "$archive.sha256" --clobber
+          else
+            gh release create "$tag" "$archive" "$archive.sha256" \
+              --target "$GITHUB_SHA" --draft --title "Sidetone $RELEASE_VERSION" \
+              --generate-notes --notes 'This download supports macOS 13 and later on Apple Silicon and Intel. It uses ad hoc signing and is not notarized. macOS can show a security warning. The source code for this build is in the source archives below. Sidetone is licensed under GPL-3.0-only.'
+          fi

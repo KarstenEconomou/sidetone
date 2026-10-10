@@ -2,7 +2,8 @@
 
 ## Build and package
 
-Use an Apple Silicon Mac with macOS 13 or later and Swift 6 command line tools.
+Use a Mac with macOS 13 or later and Xcode 26 or its command line tools.
+The build requires Swift 6 and the macOS 26 SDK.
 The Swift Testing suite requires macOS 14 or later. The test script locates the
 Testing framework in the command line tools when full Xcode is not selected.
 The project has no external packages.
@@ -16,11 +17,15 @@ Scripts/benchmark.sh
 
 The build script creates a standalone app with a local code signature and the
 hardened runtime. The only entitlement is audio input. This signature supports
-local use. Public distribution requires a Developer ID Application certificate
-and a notarytool keychain profile.
+local use. GitHub release downloads use ad hoc signing and are not notarized.
+A notarized build requires a Developer ID Application certificate and a
+notarytool keychain profile.
 The app and probe scripts use one bundle function. It signs and checks a staged
 bundle before it replaces the destination. `CONFIGURATION` selects the build
-configuration. Its default is `release`.
+configuration. Its default is `release`. `BUILD_ARCHITECTURES` selects `arm64`,
+`x86_64`, or both. Its default is the host architecture. `VERSION` sets the app
+version. `BUILD_NUMBER` sets the bundle build number; its default is 1.
+The bundle contains the GPL-3.0 license text.
 
 ```sh
 SIGNING_IDENTITY='Developer ID Application: NAME (TEAM)' \
@@ -28,7 +33,8 @@ NOTARY_PROFILE='PROFILE' Scripts/distribute.sh
 ```
 
 The distribution script signs the app, submits the ZIP file to Apple, attaches
-the notary ticket, checks Gatekeeper, and creates `dist/Sidetone.zip`.
+the notary ticket, checks Gatekeeper, and creates
+`dist/Sidetone-VERSION-macos-universal.zip` with a SHA-256 checksum file.
 Credentials stay in the keychain. The script does not create credentials.
 
 ## Control and audio ownership

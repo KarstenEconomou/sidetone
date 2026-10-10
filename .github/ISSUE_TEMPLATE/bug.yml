@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a problem with Sidetone.
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Sidetone version and macOS version
+      placeholder: Sidetone 1.0.0, macOS 26
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the steps, expected result, and actual result.
+    validations:
+      required: true
+  - type: textarea
+    id: devices
+    attributes:
+      label: Audio devices
+      description: List the input and output devices. Add copied diagnostics from Settings if possible.
