@@ -44,3 +44,127 @@ struct LevelMeter: View {
         }
     }
 }
+
+@MainActor struct MonitorHeader: View {
+    @ObservedObject var model: MonitorModel
+    let title: String
+    var onBack: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            if let onBack {
+                Button(action: onBack) {
+                    Image(systemName: "chevron.left")
+                        .font(.body.weight(.semibold))
+                        .frame(width: 24, height: 28)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .help("Back to Sidetone")
+                .accessibilityLabel("Back to Sidetone")
+            } else {
+                Image(systemName: "waveform")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(.tint)
+                    .frame(width: 24)
+                    .accessibilityHidden(true)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.headline)
+                Text(model.status).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Toggle(
+                "Enable Sidetone",
+                isOn: Binding(get: { model.enabled }, set: { model.setEnabled($0) })
+            )
+            .toggleStyle(.switch)
+            .controlSize(.small)
+            .labelsHidden()
+            .accessibilityLabel("Enable Sidetone")
+        }
+    }
+}
+
+@MainActor struct ProfilePicker: View {
+    @ObservedObject var model: MonitorModel
+
+    var body: some View {
+        Picker(
+            "Sound profile",
+            selection: Binding(
+                get: { model.settings.profile },
+                set: { value in model.updateSettings { $0.selectProfile(value) } }
+            )
+        ) {
+            ForEach(MonitorProfile.allCases) { profile in
+                Text(profile.rawValue).frame(maxWidth: .infinity).tag(profile)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: .infinity)
+    }
+}
+
+extension MonitorProfile {
+    var summary: String {
+        switch self {
+        case .direct: "Your voice without tone shaping."
+        case .natural: "Light tone shaping for a natural voice."
+        case .voice: "More tone shaping for a clear voice."
+        }
+    }
+}
+
+struct SettingSlider: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let unit: String
+    var precision = 0
+    var logarithmic = false
+
+    init(
+        _ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String,
+        precision: Int = 0, logarithmic: Bool = false
+    ) {
+        self.title = title
+        self._value = value
+        self.range = range
+        self.unit = unit
+        self.precision = precision
+        self.logarithmic = logarithmic
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text(title)
+                Spacer()
+                Text("\(value.formatted(.number.precision(.fractionLength(precision)))) \(unit)")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            Slider(value: sliderValue, in: sliderRange)
+                .controlSize(.small)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel(title)
+                .accessibilityValue(
+                    "\(value.formatted(.number.precision(.fractionLength(precision)))) \(unit)")
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var sliderRange: ClosedRange<Double> {
+        logarithmic ? log10(range.lowerBound)...log10(range.upperBound) : range
+    }
+
+    private var sliderValue: Binding<Double> {
+        Binding(
+            get: { logarithmic ? log10(value) : value },
+            set: { value = logarithmic ? pow(10, $0) : $0 }
+        )
+    }
+}

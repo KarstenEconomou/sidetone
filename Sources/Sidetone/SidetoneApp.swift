@@ -11,6 +11,16 @@ enum SidetoneApp {
         let delegate = AppDelegate()
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
+        let menu = NSMenu()
+        let applicationItem = NSMenuItem()
+        menu.addItem(applicationItem)
+        let applicationMenu = NSMenu(title: "Sidetone")
+        applicationMenu.addItem(
+            withTitle: "Quit Sidetone", action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q"
+        ).target = app
+        applicationItem.submenu = applicationMenu
+        app.mainMenu = menu
         withExtendedLifetime(delegate) { app.run() }
     }
 }
