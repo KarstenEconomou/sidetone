@@ -11,14 +11,10 @@ import SwiftUI
     }
 
     @ObservedObject var model: MonitorModel
-    let onBack: () -> Void
     @State private var pane = Pane.sound
 
     var body: some View {
         VStack(spacing: 0) {
-            MonitorHeader(model: model, title: "Settings", onBack: onBack)
-                .padding(16)
-            Divider()
             Picker("Settings section", selection: $pane) {
                 ForEach(Pane.allCases) { pane in Text(pane.rawValue).tag(pane) }
             }
@@ -36,8 +32,9 @@ import SwiftUI
             }
             .formStyle(.grouped)
             .controlSize(.small)
-            .frame(height: paneHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(width: 460, height: 520)
     }
 
     private var sound: some View {
@@ -195,15 +192,6 @@ import SwiftUI
         model.inputDevices.first { device in
             model.settings.inputUID.map { $0 == device.uid } ?? device.isDefaultInput
         }?.inputChannels ?? 0
-    }
-
-    private var paneHeight: CGFloat {
-        switch pane {
-        case .sound: 420
-        case .devices: 280
-        case .general: 250
-        case .diagnostics: 400
-        }
     }
 
     private func format(rate: Double, frames: Int) -> String {

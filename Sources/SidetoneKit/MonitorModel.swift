@@ -131,7 +131,8 @@ public final class MonitorModel: ObservableObject {
         }
     }
 
-    public func setPopoverVisible(_ visible: Bool) {
+    public func setInterfaceVisible(_ visible: Bool) {
+        guard visible != (meterTask != nil) else { return }
         meterTask?.cancel()
         meterTask = nil
         if visible {

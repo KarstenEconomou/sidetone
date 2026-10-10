@@ -16,20 +16,33 @@ enum SidetoneApp {
         menu.addItem(applicationItem)
         let applicationMenu = NSMenu(title: "Sidetone")
         applicationMenu.addItem(
+            withTitle: "Settings…", action: #selector(AppDelegate.showSettings(_:)),
+            keyEquivalent: ","
+        ).target = delegate
+        applicationMenu.addItem(.separator())
+        applicationMenu.addItem(
             withTitle: "Quit Sidetone", action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ).target = app
         applicationItem.submenu = applicationMenu
+        let fileItem = NSMenuItem()
+        let fileMenu = NSMenu(title: "File")
+        fileMenu.addItem(
+            withTitle: "Close Window", action: #selector(NSWindow.performClose(_:)),
+            keyEquivalent: "w")
+        fileItem.submenu = fileMenu
+        menu.addItem(fileItem)
         app.mainMenu = menu
         withExtendedLifetime(delegate) { app.run() }
     }
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
     private let model = MonitorModel()
     private let popover = NSPopover()
     private var statusItem: NSStatusItem?
+    private var settingsWindow: NSWindow?
     private var subscriptions = Set<AnyCancellable>()
     private var hotKey: GlobalShortcut?
 
@@ -45,7 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         popover.behavior = .transient
         popover.delegate = self
-        let host = NSHostingController(rootView: MonitorView(model: model))
+        let host = NSHostingController(
+            rootView: MonitorView(model: model) { [weak self] in self?.showSettings(nil) })
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
         model.$phase.sink { [weak self] phase in
@@ -83,15 +97,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
+    @objc func showSettings(_ sender: Any?) {
+        let window: NSWindow
+        if let settingsWindow {
+            window = settingsWindow
+        } else {
+            window = NSWindow(
+                contentViewController: NSHostingController(rootView: SettingsView(model: model)))
+            window.styleMask = [.titled, .closable]
+            window.title = "Sidetone Settings"
+            window.isReleasedWhenClosed = false
+            window.delegate = self
+            window.center()
+            window.setFrameAutosaveName("Settings")
+            settingsWindow = window
+        }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        popover.performClose(nil)
+        updateInterfaceVisibility()
+    }
+
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)
         -> Bool
     {
-        if !popover.isShown { togglePopover() }
+        if let settingsWindow, settingsWindow.isVisible {
+            settingsWindow.makeKeyAndOrderFront(nil)
+        } else if !popover.isShown {
+            togglePopover()
+        }
         return true
     }
 
-    func popoverDidShow(_ notification: Notification) { model.setPopoverVisible(true) }
-    func popoverDidClose(_ notification: Notification) { model.setPopoverVisible(false) }
+    func popoverDidShow(_ notification: Notification) { updateInterfaceVisibility() }
+    func popoverDidClose(_ notification: Notification) { updateInterfaceVisibility() }
+
+    func windowWillClose(_ notification: Notification) {
+        model.setInterfaceVisible(popover.isShown)
+    }
+
+    private func updateInterfaceVisibility() {
+        model.setInterfaceVisible(popover.isShown || settingsWindow?.isVisible == true)
+    }
     @objc private func willSleep() { model.systemWillSleep() }
     @objc private func didWake() { model.systemDidWake() }
 

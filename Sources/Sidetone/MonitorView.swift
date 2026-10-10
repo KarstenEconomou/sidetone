@@ -4,22 +4,9 @@ import SwiftUI
 
 @MainActor struct MonitorView: View {
     @ObservedObject var model: MonitorModel
-    @State private var showsSettings = false
+    let openSettings: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            if showsSettings {
-                SettingsView(model: model) { showsSettings = false }
-            } else {
-                monitor
-            }
-        }
-        .frame(width: 360)
-        .fixedSize(horizontal: true, vertical: true)
-        .onDisappear { showsSettings = false }
-    }
-
-    private var monitor: some View {
         VStack(spacing: 0) {
             MonitorHeader(model: model, title: "Sidetone")
                 .padding(16)
@@ -36,9 +23,7 @@ import SwiftUI
             .padding(16)
             Divider()
             HStack {
-                Button {
-                    showsSettings = true
-                } label: {
+                Button(action: openSettings) {
                     Label("Settings…", systemImage: "gearshape")
                 }
                 .keyboardShortcut(",")
@@ -51,17 +36,21 @@ import SwiftUI
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
+        .frame(width: 360)
+        .fixedSize(horizontal: true, vertical: true)
     }
 
     private var devices: some View {
         VStack(alignment: .leading, spacing: 10) {
             Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 8) {
                 GridRow {
-                    Text("Input").foregroundStyle(.secondary)
+                    Label("Input", systemImage: "mic")
+                        .foregroundStyle(.secondary)
                     devicePicker("Input", devices: model.inputDevices, path: \.inputUID)
                 }
                 GridRow {
-                    Text("Output").foregroundStyle(.secondary)
+                    Label("Output", systemImage: "headphones")
+                        .foregroundStyle(.secondary)
                     devicePicker("Output", devices: model.outputDevices, path: \.outputUID)
                 }
             }
@@ -155,7 +144,7 @@ import SwiftUI
         return String(format: "%.0f dBFS", 20 * log10(model.metrics.peakInput))
     }
 
-    private func devicePicker(
+    @ViewBuilder private func devicePicker(
         _ title: String, devices: [AudioDevice], path: WritableKeyPath<MonitorSettings, String?>
     ) -> some View {
         let current = devices.first { path == \.inputUID ? $0.isDefaultInput : $0.isDefaultOutput }
@@ -164,7 +153,7 @@ import SwiftUI
             saved.map { uid in
                 devices.first { $0.uid == uid }?.name ?? "Saved device (unavailable)"
             } ?? current.map { "Default — \($0.name)" } ?? "Default (unavailable)"
-        return Menu {
+        let menu = Menu {
             Picker(title, selection: model.binding(path)) {
                 Text("System default").tag(nil as String?)
                 Divider()
@@ -185,8 +174,14 @@ import SwiftUI
         }
         .menuStyle(.button)
         .buttonStyle(.bordered)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityLabel("\(title) device")
         .accessibilityValue(label)
+
+        if #available(macOS 26.0, *) {
+            menu.buttonSizing(.flexible)
+        } else {
+            menu
+        }
     }
 }

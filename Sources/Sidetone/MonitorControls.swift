@@ -49,27 +49,14 @@ struct LevelMeter: View {
 @MainActor struct MonitorHeader: View {
     @ObservedObject var model: MonitorModel
     let title: String
-    var onBack: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 10) {
-            if let onBack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 24, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-                .help("Back to Sidetone")
-                .accessibilityLabel("Back to Sidetone")
-            } else {
-                Image(systemName: "waveform")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(.tint)
-                    .frame(width: 24)
-                    .accessibilityHidden(true)
-            }
+            Image(systemName: "waveform")
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.tint)
+                .frame(width: 24)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
                 Text(model.status).font(.caption).foregroundStyle(.secondary)
