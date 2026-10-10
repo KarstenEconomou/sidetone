@@ -19,7 +19,7 @@ struct SettingsTests {
         saved.highPassHz = 95
         saved.eqFrequencyHz = 3400
         saved.eqGainDB = 2
-        saved.eqQ = 1.2
+        saved.eqQ = 5
         saved.compression = true
         saved.globalShortcut = true
         store.save(saved)

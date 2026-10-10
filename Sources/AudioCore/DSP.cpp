@@ -64,7 +64,7 @@ void DSP::setParameters(STParameters parameters) noexcept {
     parameters.highPassHz = finiteRange(parameters.highPassHz, 20, 300, 75);
     parameters.eqFrequencyHz = finiteRange(parameters.eqFrequencyHz, 80, 16000, 1800);
     parameters.eqGainDB = finiteRange(parameters.eqGainDB, -12, 12, 0);
-    parameters.eqQ = finiteRange(parameters.eqQ, 0.2f, 4.0f, 0.7f);
+    parameters.eqQ = finiteRange(parameters.eqQ, 0.2f, 5.0f, 0.7f);
     requested_ = parameters;
     const double frequency = std::min(static_cast<double>(parameters.eqFrequencyHz), sampleRate_ * 0.45);
     const std::array<std::array<double, 5>, 5> filters{

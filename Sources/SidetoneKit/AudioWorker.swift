@@ -96,6 +96,8 @@ actor AudioWorker: AudioWorking {
         }
         identity.outputDataSource = route.output.outputDataSource
         identity.outputJackState = route.output.outputJackState
+        identity.outputLeftChannel = UInt32(route.output.outputLeftChannel)
+        identity.outputRightChannel = UInt32(route.output.outputRightChannel)
         let result = st_engine_start_checked(engine.pointer, configuration, identity)
         let error = result == 0 ? nil : String(cString: st_engine_error(engine.pointer))
         if let error { logger.error("Start failed: \(error, privacy: .public)") }
@@ -127,7 +129,8 @@ actor AudioWorker: AudioWorking {
                             sampleRate: value.sampleRate, bufferFrames: Int(value.bufferFrames),
                             minBufferFrames: Int(value.minBufferFrames), maxBufferFrames: Int(value.maxBufferFrames),
                             isDefaultInput: value.isDefaultInput != 0, isDefaultOutput: value.isDefaultOutput != 0,
-                            outputDataSource: value.outputDataSource, outputJackState: value.outputJackState)
+                            outputDataSource: value.outputDataSource, outputJackState: value.outputJackState,
+                            outputLeftChannel: Int(value.outputLeftChannel), outputRightChannel: Int(value.outputRightChannel))
             }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
         }
         return DeviceUpdate(generation: current, devices: devices, metrics: includeMetrics ? metrics() : nil)

@@ -72,6 +72,8 @@ int main() {
             std::memcpy(identity.outputUID, output->uid, sizeof(identity.outputUID));
             identity.outputDataSource = output->outputDataSource;
             identity.outputJackState = output->outputJackState;
+            identity.outputLeftChannel = output->outputLeftChannel;
+            identity.outputRightChannel = output->outputRightChannel;
             const STConfiguration selected{input->id, output->id, 0, 64};
             const auto rejectIdentity = [&](STRouteIdentity changed, const char *error) {
                 require(st_engine_start_checked(engine, selected, changed) != 0,
@@ -94,6 +96,12 @@ int main() {
             changed = identity;
             changed.outputJackState = identity.outputJackState == 0 ? 2 : 0;
             rejectIdentity(changed, "output connection");
+            changed = identity;
+            changed.outputLeftChannel ^= 1;
+            rejectIdentity(changed, "output channels");
+            changed = identity;
+            changed.outputRightChannel ^= 1;
+            rejectIdentity(changed, "output channels");
             rejectIdentity({}, "microphone identity");
             require(st_engine_start_checked(engine, {input->id, output->id, input->inputChannels, 64}, identity) != 0,
                     "A matching route must still reject an unavailable channel.");

@@ -71,7 +71,8 @@ finite and bounded. The interface limits gain to -60 through 0 dB.
 
 Natural mode adds a second-order high-pass filter and one parametric EQ band.
 Voice mode uses a high-pass cutoff of at least 110 Hz, adds 3 dB to the EQ band,
-and reduces 350 Hz by 2 dB. The EQ controls set frequency, gain, and Q. Filter
+and reduces 350 Hz by 2 dB. The EQ controls set frequency, gain, and Q.
+The supported Q range is 0.2 through 5.0. Filter
 coefficients follow the [Audio EQ Cookbook](https://www.w3.org/TR/audio-eq-cookbook/).
 The coefficient calculation limits frequency to 45 percent of the current
 sample rate. The stored frequency remains intact across rate changes.
@@ -105,14 +106,18 @@ before audio starts.
 
 Settings use stable device UIDs. A saved device that is unavailable does not
 fall back to another device. System-default selections resolve to the current
-Core Audio defaults. Startup checks the expected device UIDs, output source, and jack state before
-configuration and again before I/O starts. A change to the active destination
-stops monitoring.
+Core Audio defaults. Startup checks the expected device UIDs, output source,
+jack state, and effective output channel pair before configuration and again
+before I/O starts. The effective pair uses the device's valid preferred stereo
+channels. Otherwise, it uses the first two channels, or one channel for mono.
+A change to the active destination stops monitoring.
 An output data-source, jack, or stereo-channel change also stops output.
 The user must enable the new route.
 
-Sleep stops the units. Recovery can resume only the same device route,
-including its output source and jack state. Recovery limits gain to -18 dB.
+Sleep stops the units. Each automatic restart requires the same saved device
+route, including its output source, jack state, and output channel pair.
+This check also applies to buffer and input-channel changes while monitoring.
+Recovery limits gain to -18 dB.
 The app starts with monitoring off. Microphone permission is requested only
 when the user enables monitoring. The app has no recording or network path.
 
@@ -154,9 +159,11 @@ The C++ tests pass for finite output, gain, filters, compression, profile
 transitions, ring wrap, outage recovery, supported capacity, and rate conversion.
 Four 90-second synthetic runs at plus and minus 100 and 1000 ppm have no buffer
 underruns or overruns. The maximum queue latency is 3.92 ms. Lifecycle tests
-include 1000 failed starts, repeated stops, and route-identity checks. The 24
+include 1000 failed starts, repeated stops, and route-identity checks. The 27
 Swift tests pass for settings, device selection, permission requests, sleep,
-recovery, and stale control requests. Address, undefined-behavior, and thread
+recovery, and stale control requests. Route tests cover a configuration change
+during a pending poll and an output-pair change during sleep or disconnection.
+Address, undefined-behavior, and thread
 sanitizer runs report no defects.
 
 The hardware route is MacBook Pro Microphone to External Headphones at 48 kHz.

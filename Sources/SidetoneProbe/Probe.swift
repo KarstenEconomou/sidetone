@@ -66,7 +66,9 @@ func fixedString<T>(_ value: T) -> String {
         let selectedOutput = devices.first { $0.id == output }!
         let identity = STRouteIdentity(inputUID: selectedInput.uid, outputUID: selectedOutput.uid,
                                        outputDataSource: selectedOutput.outputDataSource,
-                                       outputJackState: selectedOutput.outputJackState)
+                                       outputJackState: selectedOutput.outputJackState,
+                                       outputLeftChannel: selectedOutput.outputLeftChannel,
+                                       outputRightChannel: selectedOutput.outputRightChannel)
         var parameters = STParameters(gainDB: gain, profile: 0, highPassHz: 80,
                                      eqFrequencyHz: 2200, eqGainDB: 0, eqQ: 0.7, compression: 0)
         st_engine_set_parameters(engine, parameters)

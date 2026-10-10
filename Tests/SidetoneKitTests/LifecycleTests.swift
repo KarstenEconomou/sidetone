@@ -9,6 +9,8 @@ private actor TestAudioWorker: AudioWorking {
     private(set) var starts = 0
     private(set) var gainDB = -18.0
     private(set) var bufferFrames = 0
+    private(set) var outputUID: String?
+    private(set) var outputPair: [Int] = []
     private var failedStarts = 0
     private var nextPollGate: PermissionGate?
 
@@ -19,7 +21,7 @@ private actor TestAudioWorker: AudioWorking {
     func blockNextPoll(_ gate: PermissionGate) { nextPollGate = gate }
     func apply(route: AudioRoute?, settings: MonitorSettings, revision: UInt64, parameterRevision: UInt64) -> EngineResult {
         sample.running = false
-        guard route != nil else { return EngineResult(running: false, error: nil) }
+        guard let route else { return EngineResult(running: false, error: nil) }
         starts += 1
         if failedStarts > 0 {
             failedStarts -= 1
@@ -29,6 +31,8 @@ private actor TestAudioWorker: AudioWorking {
         sample.running = true
         gainDB = settings.gainDB
         bufferFrames = settings.bufferFrames
+        outputUID = route.output.uid
+        outputPair = [route.output.outputLeftChannel, route.output.outputRightChannel]
         return EngineResult(running: true, error: nil)
     }
     func setParameters(_ settings: MonitorSettings, revision: UInt64) { gainDB = settings.gainDB }
@@ -247,6 +251,81 @@ struct LifecycleTests {
         #expect(model.phase == .off)
         await model.pollDevices()
         #expect(await fixture.worker.starts == 1)
+        await model.shutdown()
+    }
+
+    @Test(arguments: [false, true])
+    func configurationRestartAfterPendingDefaultChangeRequiresUserAction(changeInputChannel: Bool) async throws {
+        let fixture = Fixture()
+        defer { fixture.clean() }
+        let microphone = AudioDevice(id: 1, uid: "mic", name: "Mic", inputChannels: 2, isDefaultInput: true)
+        await fixture.worker.setDevices([microphone, fixture.output])
+        let model = fixture.model()
+        model.setEnabled(true)
+        try await waitUntil { model.phase == .monitoring }
+        let speakers = AudioDevice(id: 4, uid: "speakers", name: "Speakers", outputChannels: 2, isDefaultOutput: true)
+        await fixture.worker.setDevices([microphone, speakers])
+        let gate = PermissionGate()
+        await fixture.worker.blockNextPoll(gate)
+        let poll = Task { await model.pollDevices(force: true) }
+        try await waitUntil { await gate.entered }
+        model.updateSettings { $0.bufferFrames = 128 }
+        try await waitUntil {
+            let starts = await fixture.worker.starts
+            return starts == 2 && model.phase == .monitoring
+        }
+        await gate.release()
+        await poll.value
+        #expect(model.route?.output.uid == "speakers")
+        model.updateSettings {
+            if changeInputChannel { $0.inputChannel = 1 }
+            else { $0.bufferFrames = 256 }
+        }
+        #expect(!model.enabled)
+        #expect(model.phase == .off)
+        try await waitUntil { !(await fixture.worker.metrics()).running }
+        #expect(await fixture.worker.starts == 2)
+        #expect(await fixture.worker.outputUID == "iem")
+        await model.pollDevices(force: true)
+        #expect(await fixture.worker.starts == 2)
+        model.setEnabled(true)
+        try await waitUntil { model.phase == .monitoring }
+        #expect(await fixture.worker.starts == 3)
+        #expect(await fixture.worker.outputUID == "speakers")
+        await model.shutdown()
+    }
+
+    @Test(arguments: [false, true])
+    func changedOutputPairRequiresUserActionAfterInterruption(sleep: Bool) async throws {
+        let fixture = Fixture()
+        defer { fixture.clean() }
+        let output = AudioDevice(id: 2, uid: "iem", name: "IEM", outputChannels: 4, isDefaultOutput: true)
+        await fixture.worker.setDevices([fixture.microphone, output])
+        let model = fixture.model()
+        model.setEnabled(true)
+        try await waitUntil { model.phase == .monitoring }
+        #expect(await fixture.worker.outputPair == [0, 1])
+        if sleep {
+            model.systemWillSleep()
+            try await waitUntil { !(await fixture.worker.metrics()).running }
+        } else {
+            await fixture.worker.setDevices([fixture.microphone])
+            await model.pollDevices()
+            #expect(model.phase == .waiting)
+        }
+        let changed = AudioDevice(id: 2, uid: "iem", name: "IEM", outputChannels: 4,
+                                  isDefaultOutput: true, outputLeftChannel: 2, outputRightChannel: 3)
+        await fixture.worker.setDevices([fixture.microphone, changed])
+        if sleep { model.systemDidWake() }
+        else { await model.pollDevices() }
+        try await waitUntil { !model.enabled }
+        #expect(model.phase == .off)
+        #expect(await fixture.worker.starts == 1)
+        #expect(await fixture.worker.outputPair == [0, 1])
+        model.setEnabled(true)
+        try await waitUntil { model.phase == .monitoring }
+        #expect(await fixture.worker.starts == 2)
+        #expect(await fixture.worker.outputPair == [2, 3])
         await model.shutdown()
     }
 

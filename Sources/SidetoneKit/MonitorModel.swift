@@ -268,6 +268,10 @@ public final class MonitorModel: ObservableObject {
             Task { _ = await worker.apply(route: nil, settings: settings, revision: request, parameterRevision: parameters) }
             return
         }
+        if recovering && !RouteSelection.canResume(previous: resumeRoute, next: route) {
+            stop(message: "The audio route changed. Check the output, then turn on Sidetone.")
+            return
+        }
         if recovering && settings.gainDB > -18 {
             settings.gainDB = -18
             parameterRevision &+= 1

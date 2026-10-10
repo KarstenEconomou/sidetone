@@ -56,4 +56,15 @@ struct DeviceTests {
         let next = RouteSelection.resolve(settings: MonitorSettings(), devices: [microphone, unplugged])
         #expect(!RouteSelection.canResume(previous: previous, next: next))
     }
+
+    @Test(arguments: [false, true])
+    func changingEitherOutputChannelRequiresUserAction(changeLeft: Bool) throws {
+        let output = AudioDevice(id: 2, uid: "iem", name: "Headphones", outputChannels: 4, isDefaultOutput: true)
+        let changed = AudioDevice(id: 2, uid: "iem", name: "Headphones", outputChannels: 4,
+                                  isDefaultOutput: true, outputLeftChannel: changeLeft ? 2 : 0,
+                                  outputRightChannel: changeLeft ? 1 : 3)
+        let previous = try #require(RouteSelection.resolve(settings: MonitorSettings(), devices: [microphone, output]))
+        let next = RouteSelection.resolve(settings: MonitorSettings(), devices: [microphone, changed])
+        #expect(!RouteSelection.canResume(previous: previous, next: next))
+    }
 }

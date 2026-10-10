@@ -125,6 +125,19 @@ void testEQRateChanges() {
                 "EQ keeps its selected frequency across sample-rate changes");
     }
 }
+void testEQWidth() {
+    for (uint32_t profile : {1U, 2U}) {
+        double previous = response({0, profile, 75, 1500, 6, 4, 0}, 1800);
+        for (float q : {4.1f, 4.5f, 5.0f}) {
+            const double narrower = response({0, profile, 75, 1500, 6, q, 0}, 1800);
+            require(narrower < previous - 0.000001,
+                    "EQ width increases through Q 5 in Natural and Voice");
+            previous = narrower;
+        }
+        const double aboveLimit = response({0, profile, 75, 1500, 6, 6, 0}, 1800);
+        require(std::abs(aboveLimit - previous) < 0.000001, "EQ width is bounded at Q 5");
+    }
+}
 void testProfileTransitions() {
     sidetone::DSP dsp;
     dsp.prepare(48000);
@@ -144,7 +157,7 @@ void testProfileTransitions() {
         if (index % 127 == 0) {
             dsp.setParameters({6, random % 3, (random & 1) ? 300.0f : 20.0f,
                 (random & 2) ? 15000.0f : 80.0f, (random & 4) ? 12.0f : -12.0f,
-                (random & 8) ? 4.0f : 0.2f, random % 2});
+                (random & 8) ? 5.0f : 0.2f, random % 2});
         }
         const float input = static_cast<float>(random) / static_cast<float>(UINT32_MAX) * 8.0f - 4.0f;
         const float output = dsp.process(input);
@@ -300,6 +313,7 @@ int main() {
     testTransportSafety();
     testProfiles();
     testEQRateChanges();
+    testEQWidth();
     testProfileTransitions();
     testParameterConcurrency();
     testResampling();

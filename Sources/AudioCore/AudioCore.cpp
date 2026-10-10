@@ -105,6 +105,13 @@ bool describeDevice(AudioDeviceID device, STDevice &description) {
         UInt32 connected = 0;
         if (readProperty(device, kAudioDevicePropertyJackIsConnected, connected, kAudioObjectPropertyScopeOutput))
             description.outputJackState = connected ? 2 : 1;
+        description.outputRightChannel = description.outputChannels > 1 ? 1 : 0;
+        UInt32 preferred[2]{};
+        if (readProperty(device, kAudioDevicePropertyPreferredChannelsForStereo, preferred, kAudioObjectPropertyScopeOutput) &&
+            preferred[0] && preferred[1] && preferred[0] <= description.outputChannels && preferred[1] <= description.outputChannels) {
+            description.outputLeftChannel = preferred[0] - 1;
+            description.outputRightChannel = preferred[1] - 1;
+        }
     }
     AudioValueRange range{};
     if (readProperty(device, kAudioDevicePropertyBufferFrameSizeRange, range)) {
@@ -437,6 +444,11 @@ struct STEngine {
             std::snprintf(error, sizeof(error), "The output connection changed. Check the headphones and start monitoring again.");
             return false;
         }
+        if (currentOutput.outputLeftChannel != identity.outputLeftChannel ||
+            currentOutput.outputRightChannel != identity.outputRightChannel) {
+            std::snprintf(error, sizeof(error), "The output channels changed. Check the headphones and start monitoring again.");
+            return false;
+        }
         return true;
     }
 
@@ -483,14 +495,8 @@ struct STEngine {
         if (!inputList) throw std::bad_alloc();
         inputList->mNumberBuffers = input.inputChannels;
         for (UInt32 channel = 0; channel < input.inputChannels; ++channel) inputList->mBuffers[channel].mNumberChannels = 1;
-        outputLeft = 0;
-        outputRight = output.outputChannels > 1 ? 1 : 0;
-        UInt32 preferred[2]{};
-        if (readProperty(output.id, kAudioDevicePropertyPreferredChannelsForStereo, preferred, kAudioObjectPropertyScopeOutput) &&
-            preferred[0] && preferred[1] && preferred[0] <= output.outputChannels && preferred[1] <= output.outputChannels) {
-            outputLeft = preferred[0] - 1;
-            outputRight = preferred[1] - 1;
-        }
+        outputLeft = output.outputLeftChannel;
+        outputRight = output.outputRightChannel;
         dsp.prepare(output.sampleRate);
         if (!sharedUnit) transport.prepare(input.sampleRate, output.sampleRate, input.bufferFrames, output.bufferFrames);
         inputCallbacks.store(0); outputCallbacks.store(0); inputMisses.store(0); outputMisses.store(0);
@@ -518,6 +524,8 @@ struct STEngine {
         }
         if (identity && !matchesRoute(currentInput, currentOutput, *identity)) return false;
         if (currentInput.inputChannels != input.inputChannels || currentOutput.outputChannels != output.outputChannels ||
+            currentOutput.outputLeftChannel != output.outputLeftChannel ||
+            currentOutput.outputRightChannel != output.outputRightChannel ||
             currentInput.sampleRate != input.sampleRate || currentOutput.sampleRate != output.sampleRate ||
             currentInput.bufferFrames != input.bufferFrames || currentOutput.bufferFrames != output.bufferFrames) {
             std::snprintf(error, sizeof(error), "The audio device changed during setup. Start monitoring again."); return false;

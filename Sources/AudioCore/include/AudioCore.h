@@ -21,6 +21,8 @@ typedef struct {
     uint32_t isDefaultOutput;
     uint32_t outputDataSource;
     uint32_t outputJackState; /* 0 unknown, 1 disconnected, 2 connected. */
+    uint32_t outputLeftChannel; /* Effective output channels, numbered from zero. */
+    uint32_t outputRightChannel;
 } STDevice;
 typedef struct {
     uint32_t inputDevice;
@@ -33,6 +35,8 @@ typedef struct {
     char outputUID[256];
     uint32_t outputDataSource;
     uint32_t outputJackState;
+    uint32_t outputLeftChannel;
+    uint32_t outputRightChannel;
 } STRouteIdentity;
 typedef struct {
     float gainDB;
@@ -73,7 +77,7 @@ uint64_t st_device_generation(void);
 STEngine *st_engine_create(void);
 void st_engine_destroy(STEngine *engine);
 int32_t st_engine_start(STEngine *engine, STConfiguration configuration);
-/* Checks both device UIDs and the output connection before capture and playback. */
+/* Checks device UIDs, the output connection, and output channels before I/O. */
 int32_t st_engine_start_checked(STEngine *engine, STConfiguration configuration, STRouteIdentity identity);
 void st_engine_stop(STEngine *engine);
 void st_engine_set_parameters(STEngine *engine, STParameters parameters);
