@@ -52,10 +52,8 @@ struct LevelMeter: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "waveform")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.tint)
-                .frame(width: 24)
+            Image(nsImage: SidetoneGlyph.image(size: NSSize(width: 24, height: 24)))
+                .frame(width: 24, height: 24)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)
