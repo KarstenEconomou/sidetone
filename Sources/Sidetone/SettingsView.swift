@@ -40,11 +40,7 @@ import SwiftUI
     private var sound: some View {
         Form {
             Section {
-                VStack(alignment: .leading, spacing: 8) {
-                    ProfilePicker(model: model)
-                    Text(model.settings.profile.summary)
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                ProfilePicker(model: model)
             }
             Section {
                 SettingSlider(

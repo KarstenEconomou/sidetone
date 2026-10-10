@@ -96,10 +96,6 @@ import SwiftUI
         VStack(alignment: .leading, spacing: 7) {
             Text("Sound").font(.caption).foregroundStyle(.secondary)
             ProfilePicker(model: model)
-            Text(model.settings.profile.summary)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

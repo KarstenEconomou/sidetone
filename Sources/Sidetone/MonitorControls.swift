@@ -78,7 +78,7 @@ struct LevelMeter: View {
     @ObservedObject var model: MonitorModel
 
     var body: some View {
-        Picker(
+        let picker = Picker(
             "Sound profile",
             selection: Binding(
                 get: { model.settings.profile },
@@ -86,12 +86,22 @@ struct LevelMeter: View {
             )
         ) {
             ForEach(MonitorProfile.allCases) { profile in
-                Text(profile.rawValue).frame(maxWidth: .infinity).tag(profile)
+                Text(profile.rawValue)
+                    .frame(maxWidth: .infinity)
+                    .help(profile.summary)
+                    .accessibilityHint(profile.summary)
+                    .tag(profile)
             }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
         .frame(maxWidth: .infinity)
+
+        if #available(macOS 26.0, *) {
+            picker.buttonSizing(.flexible)
+        } else {
+            picker
+        }
     }
 }
 
