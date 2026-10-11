@@ -32,8 +32,38 @@ extension MonitorModel {
         """
     }
 
-    public func copyDiagnostics() {
+    public func copyDiagnostics(including keyboard: KeyboardModel? = nil) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(diagnostics, forType: .string)
+        let report = diagnostics + (keyboard.map { "\n\n" + $0.diagnostics } ?? "")
+        NSPasteboard.general.setString(report, forType: .string)
+    }
+}
+
+extension KeyboardModel {
+    public var diagnostics: String {
+        """
+        Keyboard sounds
+        State: \(status)
+        Output: \(output?.name ?? "Unavailable")
+        Switch: \(settings.switchType.name)
+        Volume: \(settings.volumeDB.formatted()) dB
+        Input Monitoring: \(hasInputAccess ? "Allowed" : "Not allowed")
+        Release sounds: \(settings.releaseSounds)
+        Modifier keys: \(settings.modifierSounds)
+        Key repeat: \(settings.repeatSounds)
+        Vary recordings: \(settings.varySamples)
+        Output: \(Int(metrics.outputRate)) Hz / \(metrics.outputFrames) frames
+        Output callbacks: \(metrics.callbacks)
+        Maximum callback: \(String(format: "%.3f", metrics.maxCallbackMs)) ms
+        Maximum queue wait: \(String(format: "%.3f", metrics.maxQueueMs)) ms
+        Callback overruns: \(metrics.deadlineMisses)
+        Queued sounds: \(metrics.enqueued)
+        Queue drops: \(metrics.queueDrops)
+        Voice drops: \(metrics.voiceDrops)
+        Stale sound drops: \(metrics.staleDrops)
+        Peak voices: \(metrics.peakVoices) / 64
+        Protected frames: \(metrics.clippedFrames)
+        Output stalled: \(metrics.stalled)
+        """
     }
 }

@@ -16,6 +16,7 @@ public final class MonitorModel: ObservableObject {
     @Published public private(set) var permissionDenied = false
     @Published public private(set) var launchAtLogin = false
     @Published public private(set) var loginNeedsApproval = false
+    @Published public private(set) var loginError: String?
     private let store: SettingsStore
     private let worker: any AudioWorking
     private let requestPermission: @MainActor () async -> Bool
@@ -111,16 +112,18 @@ public final class MonitorModel: ObservableObject {
     }
 
     public func updateSettings(_ update: (inout MonitorSettings) -> Void) {
+        guard !closed else { return }
         let previous = settings
         var next = settings
         update(&next)
         next.normalize()
+        guard next != previous else { return }
         settings = next
         parameterRevision &+= 1
         let parameters = parameterRevision
         store.save(next)
         if previous.inputUID != next.inputUID || previous.outputUID != next.outputUID {
-            stop(message: "Device selected. Turn on Sidetone when ready.")
+            stop(message: "Device selected. Turn on microphone monitoring when ready.")
         } else if previous.bufferFrames != next.bufferFrames
             || previous.inputChannel != next.inputChannel
         {
@@ -132,7 +135,7 @@ public final class MonitorModel: ObservableObject {
     }
 
     public func setInterfaceVisible(_ visible: Bool) {
-        guard visible != (meterTask != nil) else { return }
+        guard !closed, visible != (meterTask != nil) else { return }
         meterTask?.cancel()
         meterTask = nil
         if visible {
@@ -149,6 +152,7 @@ public final class MonitorModel: ObservableObject {
     }
 
     public func systemWillSleep() {
+        guard !closed else { return }
         sleeping = true
         guard enabled else { return }
         guard permissionGranted else {
@@ -160,6 +164,7 @@ public final class MonitorModel: ObservableObject {
     }
 
     public func systemDidWake() {
+        guard !closed else { return }
         sleeping = false
         guard enabled else { return }
         Task {
@@ -170,6 +175,7 @@ public final class MonitorModel: ObservableObject {
     }
 
     public func setLaunchAtLogin(_ value: Bool) {
+        loginError = nil
         do {
             if value {
                 try SMAppService.mainApp.register()
@@ -178,7 +184,7 @@ public final class MonitorModel: ObservableObject {
             }
             refreshLoginStatus()
         } catch {
-            message = "Could not change launch at login: \(error.localizedDescription)"
+            loginError = "Could not change launch at login: \(error.localizedDescription)"
             refreshLoginStatus()
         }
     }
@@ -197,13 +203,11 @@ public final class MonitorModel: ObservableObject {
 
     public func shutdown() async {
         closed = true
-        enabled = false
-        permissionGranted = false
         deviceTask?.cancel()
         meterTask?.cancel()
         deviceTask = nil
         meterTask = nil
-        _ = await stopAudio().value
+        _ = await stop().value
     }
 
     private func nextRequest(route: AudioRoute?) -> AudioRequest {
@@ -233,7 +237,8 @@ public final class MonitorModel: ObservableObject {
         loginNeedsApproval = status == .requiresApproval
     }
 
-    private func stop(message: String? = nil) {
+    @discardableResult
+    private func stop(message: String? = nil) -> Task<EngineResult, Never> {
         enabled = false
         permissionGranted = false
         phase = .off
@@ -243,7 +248,7 @@ public final class MonitorModel: ObservableObject {
         metrics.peakInput = 0
         metrics.peakOutput = 0
         metrics.running = false
-        stopAudio()
+        return stopAudio()
     }
 
     private func startCurrentRoute(recovering: Bool) {

@@ -45,6 +45,7 @@ enum SidetoneApp {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
     private let model = MonitorModel()
+    private let keyboard = KeyboardModel()
     private let popover = NSPopover()
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
@@ -58,20 +59,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             button.image = SidetoneGlyph.menuBarImage(active: false)
             button.target = self
             button.action = #selector(togglePopover)
-            button.toolTip = "Sidetone — Off"
+            button.setAccessibilityLabel("Sidetone")
         }
         popover.behavior = .transient
         popover.delegate = self
         let host = NSHostingController(
-            rootView: MonitorView(model: model) { [weak self] in self?.showSettings(nil) })
+            rootView: MonitorView(model: model, keyboard: keyboard) { [weak self] in
+                self?.showSettings(nil)
+            })
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
-        model.$phase.sink { [weak self] phase in
+        model.$settings.map(\.outputUID).removeDuplicates().sink { [weak self] uid in
+            MainActor.assumeIsolated { self?.keyboard.setOutputUID(uid) }
+        }.store(in: &subscriptions)
+        model.$phase.combineLatest(keyboard.$phase).sink { [weak self] phase, keyboardPhase in
             MainActor.assumeIsolated {
-                let active = phase == .monitoring
+                let microphoneOn = phase == .monitoring
+                let keyboardOn = keyboardPhase == .listening
+                let active = microphoneOn || keyboardOn
                 self?.statusItem?.button?.image = SidetoneGlyph.menuBarImage(active: active)
-                self?.statusItem?.button?.toolTip =
-                    active ? "Sidetone — Monitoring" : "Sidetone — Off"
+                self?.statusItem?.button?.setAccessibilityValue(
+                    "Microphone \(microphoneOn ? "on" : "off"), keyboard \(keyboardOn ? "on" : "off")"
+                )
             }
         }.store(in: &subscriptions)
         model.$settings.map(\.globalShortcut).removeDuplicates().sink { [weak self] enabled in
@@ -106,9 +115,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         } else {
             window = NSWindow(
                 contentViewController: NSHostingController(
-                    rootView: SettingsView(model: model) { [weak self] in self?.showAbout(nil) }))
-            window.styleMask = [.titled, .closable]
+                    rootView: SettingsView(model: model, keyboard: keyboard) { [weak self] in
+                        self?.showAbout(nil)
+                    }))
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
             window.title = "Sidetone Settings"
+            window.contentMinSize = SettingsLayout.minimumSize
+            window.setContentSize(SettingsLayout.defaultSize)
+            window.toolbarStyle = .unified
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.center()
@@ -126,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         paragraph.alignment = .center
         let credits = NSMutableAttributedString(
             string: """
-                Native macOS app for low-latency, real-time microphone monitoring through headphones.
+                Microphone monitoring and recorded keyboard sounds for macOS.
 
                 Developer: @KarstenEconomou
                 Repository: KarstenEconomou/sidetone
@@ -173,8 +187,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     private func updateInterfaceVisibility() {
         model.setInterfaceVisible(popover.isShown || settingsWindow?.isVisible == true)
     }
-    @objc private func willSleep() { model.systemWillSleep() }
-    @objc private func didWake() { model.systemDidWake() }
+    @objc private func willSleep() {
+        model.systemWillSleep()
+        keyboard.systemWillSleep()
+    }
+    @objc private func didWake() {
+        model.systemDidWake()
+        keyboard.systemDidWake()
+    }
 
     private func configureShortcut(_ enabled: Bool) {
         hotKey = nil
@@ -195,6 +215,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         Task {
             await model.shutdown()
+            await keyboard.shutdown()
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater

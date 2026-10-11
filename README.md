@@ -1,16 +1,18 @@
 # Sidetone
 
-Native macOS app for low-latency, real-time microphone monitoring through headphones.
+Native macOS menu bar app for real-time microphone monitoring and recorded keyboard sounds.
 
-Sidetone lives in the menu bar. Select a microphone and headphones, set the volume, and turn monitoring on. Choose Direct, Natural, or Voice sound. Audio stays on your Mac.
+Each feature has its own on/off switch and volume. Both use one selected output device and start off. Audio stays on your Mac. Typed text is not read or stored. Keyboard sounds pause during secure input.
 
 ## Install
 
-Download the app from [GitHub Releases](https://github.com/KarstenEconomou/sidetone/releases). Extract the ZIP file, move Sidetone to Applications, and open it. Allow microphone access when macOS asks.
+Download the app from [GitHub Releases](https://github.com/KarstenEconomou/sidetone/releases). Extract the ZIP file, move Sidetone to Applications, and open it.
+
+When you enable a feature, allow its requested access: Microphone for microphone monitoring, or Input Monitoring for keyboard sounds.
 
 Sidetone supports macOS 13 and later on Apple Silicon and Intel. Downloads use ad hoc signing and are not notarized. macOS can show a security warning.
 
-Use headphones to prevent feedback.
+Use headphones for microphone monitoring to prevent feedback.
 
 ## Build and test
 
@@ -27,7 +29,7 @@ The app is in `dist/Sidetone.app`. To build for Apple Silicon and Intel:
 BUILD_ARCHITECTURES='arm64 x86_64' Scripts/build.sh
 ```
 
-See [Engineering](docs/Engineering.md) for the audio engine and DSP design.
+See [Engineering](docs/Engineering.md) for the audio engines, sample playback, and DSP design.
 
 ## Development and releases
 
@@ -44,7 +46,7 @@ Scripts/release.sh
 The script creates a version branch and pull request. Merge it after CI passes. Then run the Release workflow with that version:
 
 ```sh
-gh workflow run release.yml -f version=1.0.0
+gh workflow run release.yml -f version=1.1.0
 ```
 
 The workflow tests the app and creates a draft GitHub release with a universal ZIP file, a SHA-256 checksum, and release notes. Review the draft and publish it on GitHub. Published versions and tags must not change.
@@ -53,4 +55,4 @@ The workflow tests the app and creates a draft GitHub release with a universal Z
 
 Sidetone is licensed under [GPL-3.0-only](LICENSE).
 
-Developer: [@KarstenEconomou](https://github.com/KarstenEconomou).
+Keyboard recordings by Thomas Lai come from [Thock sound packs](https://github.com/kamillobinski/thock-soundpacks) under the MIT license. Each [bundled sound pack](Sources/SidetoneKit/Resources/KeyboardSounds) includes its license notice and source details.

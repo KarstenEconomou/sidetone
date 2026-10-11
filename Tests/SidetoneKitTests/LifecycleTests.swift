@@ -132,6 +132,33 @@ struct LifecycleTests {
         await model.shutdown()
     }
 
+    @Test func shutdownClearsStateAndIgnoresLaterChanges() async throws {
+        let fixture = Fixture()
+        defer { fixture.clean() }
+        let model = fixture.model()
+        model.setEnabled(true)
+        try await waitUntil { model.phase == .monitoring }
+        await model.pollDevices()
+        #expect(model.metrics.running)
+        let settings = model.settings
+        await model.shutdown()
+        model.systemWillSleep()
+        model.systemDidWake()
+        model.updateSettings { $0.gainDB = -30 }
+        model.setInterfaceVisible(true)
+        model.setEnabled(true)
+        await model.pollDevices()
+        #expect(model.phase == .off)
+        #expect(!model.enabled)
+        #expect(!model.metrics.running)
+        #expect(model.metrics.peakInput == 0)
+        #expect(model.metrics.peakOutput == 0)
+        #expect(model.settings == settings)
+        #expect(SettingsStore(defaults: fixture.defaults).load() == settings)
+        #expect(await fixture.worker.starts == 1)
+        #expect(await fixture.worker.metrics().running == false)
+    }
+
     @Test func stopWhilePermissionIsPendingPreventsStart() async throws {
         let fixture = Fixture()
         defer { fixture.clean() }

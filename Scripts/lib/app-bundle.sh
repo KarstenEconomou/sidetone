@@ -40,6 +40,9 @@ package_app() (
     mkdir -p "$bundle_path/Contents/MacOS" "$bundle_path/Contents/Resources"
     xcrun lipo -create "${binaries[@]}" -output "$bundle_path/Contents/MacOS/$product"
     cp LICENSE "$bundle_path/Contents/Resources/License.txt"
+    if [[ "$product" == "Sidetone" ]]; then
+        cp -R Sources/SidetoneKit/Resources/KeyboardSounds "$bundle_path/Contents/Resources/"
+    fi
     plist="$bundle_path/Contents/Info.plist"
     cp Resources/Info.plist "$plist"
     /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $product" "$plist"
