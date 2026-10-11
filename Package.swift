@@ -20,6 +20,7 @@ let package = Package(
         ),
         .target(
             name: "SidetoneKit", dependencies: ["AudioCore"],
+            resources: [.copy("Resources/KeyboardSounds")],
             swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
         .executableTarget(
             name: "Sidetone", dependencies: ["SidetoneKit"],

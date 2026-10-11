@@ -4,6 +4,10 @@ public struct AudioDevice: Identifiable, Equatable, Sendable {
     public let id: UInt32
     public let uid: String
     public let name: String
+    public let iconURL: URL?
+    public let transportType: UInt32
+    public let inputTerminalType: UInt32
+    public let outputTerminalType: UInt32
     public let inputChannels: Int
     public let outputChannels: Int
     public let sampleRate: Double
@@ -23,11 +27,16 @@ public struct AudioDevice: Identifiable, Equatable, Sendable {
         minBufferFrames: Int = 32, maxBufferFrames: Int = 1024,
         isDefaultInput: Bool = false, isDefaultOutput: Bool = false,
         outputDataSource: UInt32 = 0, outputJackState: UInt32 = 0,
-        outputLeftChannel: UInt32 = 0, outputRightChannel: UInt32? = nil
+        outputLeftChannel: UInt32 = 0, outputRightChannel: UInt32? = nil, iconURL: URL? = nil,
+        transportType: UInt32 = 0, inputTerminalType: UInt32 = 0, outputTerminalType: UInt32 = 0
     ) {
         self.id = id
         self.uid = uid
         self.name = name
+        self.iconURL = iconURL
+        self.transportType = transportType
+        self.inputTerminalType = inputTerminalType
+        self.outputTerminalType = outputTerminalType
         self.inputChannels = inputChannels
         self.outputChannels = outputChannels
         self.sampleRate = sampleRate
@@ -56,16 +65,21 @@ public struct AudioRoute: Equatable, Sendable {
     }
 }
 
+public enum OutputSelection {
+    public static func resolve(uid: String?, devices: [AudioDevice]) -> AudioDevice? {
+        devices.first { device in
+            device.outputChannels > 0 && (uid.map { $0 == device.uid } ?? device.isDefaultOutput)
+        }
+    }
+}
+
 public enum RouteSelection {
     public static func resolve(settings: MonitorSettings, devices: [AudioDevice]) -> AudioRoute? {
         let input = devices.first { device in
             device.inputChannels > settings.inputChannel
                 && (settings.inputUID.map { $0 == device.uid } ?? device.isDefaultInput)
         }
-        let output = devices.first { device in
-            device.outputChannels > 0
-                && (settings.outputUID.map { $0 == device.uid } ?? device.isDefaultOutput)
-        }
+        let output = OutputSelection.resolve(uid: settings.outputUID, devices: devices)
         guard let input, let output else { return nil }
         return AudioRoute(input: input, output: output)
     }

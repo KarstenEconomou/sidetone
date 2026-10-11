@@ -1,7 +1,18 @@
 import AudioCore
+import CoreAudio
 import Foundation
 
 extension AudioDevice {
+    static func availableDevices() -> [AudioDevice] {
+        var raw = [STDevice](repeating: STDevice(), count: Int(st_devices(nil, 0)))
+        let count = raw.withUnsafeMutableBufferPointer {
+            st_devices($0.baseAddress, UInt32($0.count))
+        }
+        return raw.prefix(min(Int(count), raw.count)).map(AudioDevice.init).sorted {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+    }
+
     init(_ raw: STDevice) {
         self.init(
             id: raw.id,
@@ -18,9 +29,56 @@ extension AudioDevice {
             outputDataSource: raw.outputDataSource,
             outputJackState: raw.outputJackState,
             outputLeftChannel: raw.outputLeftChannel,
-            outputRightChannel: raw.outputRightChannel
+            outputRightChannel: raw.outputRightChannel,
+            iconURL: deviceIconURL(raw.id), transportType: raw.transportType,
+            inputTerminalType: raw.inputChannels > 0
+                ? deviceTerminalType(raw.id, scope: kAudioObjectPropertyScopeInput) : 0,
+            outputTerminalType: raw.outputChannels > 0
+                ? deviceTerminalType(raw.id, scope: kAudioObjectPropertyScopeOutput) : 0
         )
     }
+}
+
+private func deviceIconURL(_ id: AudioDeviceID) -> URL? {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyIcon, mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain)
+    guard AudioObjectHasProperty(id, &address) else { return nil }
+    var value: Unmanaged<CFURL>?
+    var size = UInt32(MemoryLayout.size(ofValue: value))
+    guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &value) == noErr,
+        let value
+    else { return nil }
+    let url = value.takeRetainedValue() as URL
+    return url.isFileURL ? url : nil
+}
+
+private func deviceTerminalType(_ id: AudioDeviceID, scope: AudioObjectPropertyScope) -> UInt32 {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyStreams, mScope: scope,
+        mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    guard AudioObjectGetPropertyDataSize(id, &address, 0, nil, &size) == noErr, size > 0 else {
+        return 0
+    }
+    var streams = [AudioStreamID](
+        repeating: 0, count: Int(size) / MemoryLayout<AudioStreamID>.size)
+    guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &streams) == noErr else {
+        return 0
+    }
+    for stream in streams {
+        address = AudioObjectPropertyAddress(
+            mSelector: kAudioStreamPropertyTerminalType, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var terminal: UInt32 = 0
+        size = UInt32(MemoryLayout.size(ofValue: terminal))
+        if AudioObjectGetPropertyData(stream, &address, 0, nil, &size, &terminal) == noErr,
+            terminal != 0, terminal != kAudioStreamTerminalTypeUnknown
+        {
+            return terminal
+        }
+    }
+    return 0
 }
 
 extension AudioMetrics {

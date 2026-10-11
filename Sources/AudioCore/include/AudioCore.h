@@ -85,6 +85,34 @@ void st_engine_stop(STEngine* engine);
 void st_engine_set_parameters(STEngine* engine, STParameters parameters);
 STTelemetry st_engine_telemetry(STEngine* engine);
 const char* st_engine_error(STEngine* engine);
+
+typedef struct STKeyboardEngine STKeyboardEngine;
+typedef struct {
+    double outputRate;
+    uint32_t outputBufferFrames;
+    uint64_t callbacks;
+    double maxCallbackMs;
+    double maxQueueMs;
+    uint64_t deadlineMisses;
+    uint64_t enqueued;
+    uint64_t queueDrops;
+    uint64_t voiceDrops;
+    uint64_t staleDrops;
+    uint64_t clippedFrames;
+    uint32_t peakVoices;
+    uint32_t stalled;
+} STKeyboardTelemetry;
+STKeyboardEngine* st_keyboard_create(void);
+void st_keyboard_destroy(STKeyboardEngine* engine);
+int32_t st_keyboard_start(STKeyboardEngine* engine, uint32_t device, const char* uid);
+void st_keyboard_stop(STKeyboardEngine* engine);
+void st_keyboard_set_gain(STKeyboardEngine* engine, float decibels);
+int32_t st_keyboard_load_sample(STKeyboardEngine* engine, uint32_t sample, const float* stereo,
+                                uint32_t frames, double rate);
+void st_keyboard_play(STKeyboardEngine* engine, uint32_t sample);
+uint32_t st_keyboard_running(STKeyboardEngine* engine);
+STKeyboardTelemetry st_keyboard_telemetry(STKeyboardEngine* engine);
+const char* st_keyboard_error(STKeyboardEngine* engine);
 #ifdef __cplusplus
 }
 #endif

@@ -88,13 +88,7 @@ actor AudioWorker: AudioWorking {
         let current = st_device_generation()
         var devices: [AudioDevice]?
         if generation != current {
-            var raw = [STDevice](repeating: STDevice(), count: Int(st_devices(nil, 0)))
-            let count = raw.withUnsafeMutableBufferPointer {
-                st_devices($0.baseAddress, UInt32($0.count))
-            }
-            devices = raw.prefix(min(Int(count), raw.count)).map(AudioDevice.init).sorted {
-                $0.name.localizedStandardCompare($1.name) == .orderedAscending
-            }
+            devices = AudioDevice.availableDevices()
         }
         return DeviceUpdate(
             generation: current, devices: devices, metrics: includeMetrics ? metrics() : nil
