@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 Scripts/audio-tests.sh
-test_flags=(--disable-xctest)
+test_flags=(--disable-xctest --no-parallel)
 developer_path="$(xcode-select -p)"
 framework_path="$developer_path/Library/Developer/Frameworks"
 if [[ -d "$framework_path/Testing.framework" ]]; then
