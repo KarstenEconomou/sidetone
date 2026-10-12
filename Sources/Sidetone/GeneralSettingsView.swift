@@ -35,7 +35,7 @@ struct GeneralSettingsView: View {
             } header: {
                 Text("Startup")
             } footer: {
-                Text("Both audio features are off when Sidetone opens.")
+                Text("Sidetone restores the last on/off state of each audio feature when it opens.")
             }
             Section("Keyboard shortcut") {
                 SettingsToggle(

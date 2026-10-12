@@ -72,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         model.$settings.map(\.outputUID).removeDuplicates().sink { [weak self] uid in
             MainActor.assumeIsolated { self?.keyboard.setOutputUID(uid) }
         }.store(in: &subscriptions)
+        model.restoreEnabledState()
+        keyboard.restoreEnabledState()
         model.$phase.combineLatest(keyboard.$phase).sink { [weak self] phase, keyboardPhase in
             MainActor.assumeIsolated {
                 let microphoneOn = phase == .monitoring

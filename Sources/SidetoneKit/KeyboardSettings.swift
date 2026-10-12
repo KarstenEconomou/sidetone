@@ -56,6 +56,11 @@ public final class KeyboardSettingsStore {
 
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
+    public var isEnabled: Bool {
+        get { defaults.bool(forKey: "keyboardEnabled") }
+        set { defaults.set(newValue, forKey: "keyboardEnabled") }
+    }
+
     public func load() -> KeyboardSettings {
         guard let data = defaults.data(forKey: key),
             var settings = try? JSONDecoder().decode(KeyboardSettings.self, from: data)

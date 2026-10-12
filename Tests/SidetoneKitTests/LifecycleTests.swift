@@ -104,7 +104,7 @@ struct LifecycleTests {
         try #require(satisfied)
     }
 
-    @Test func launchDoesNotRequestPermissionOrCapture() async throws {
+    @Test func firstLaunchDoesNotRequestPermissionOrCapture() async throws {
         let fixture = Fixture()
         defer { fixture.clean() }
         var requested = false
@@ -112,12 +112,37 @@ struct LifecycleTests {
             requested = true
             return true
         }
+        model.restoreEnabledState()
         await model.pollDevices()
         #expect(!model.enabled)
         #expect(model.phase == .off)
         #expect(!requested)
         #expect(await fixture.worker.starts == 0)
         await model.shutdown()
+    }
+
+    @Test func monitoringOnAndOffSurviveRelaunch() async throws {
+        let fixture = Fixture()
+        defer { fixture.clean() }
+        let model = fixture.model()
+        model.setEnabled(true)
+        try await waitUntil { model.phase == .monitoring }
+        await model.shutdown()
+
+        let reopened = fixture.model()
+        reopened.restoreEnabledState()
+        try await waitUntil { reopened.phase == .monitoring }
+        #expect(reopened.enabled)
+        reopened.setEnabled(false)
+        await reopened.shutdown()
+
+        let stopped = fixture.model()
+        stopped.restoreEnabledState()
+        await stopped.pollDevices()
+        #expect(!stopped.enabled)
+        #expect(stopped.phase == .off)
+        #expect(await fixture.worker.starts == 2)
+        await stopped.shutdown()
     }
 
     @Test func permissionDenialKeepsCaptureOff() async throws {
@@ -129,6 +154,7 @@ struct LifecycleTests {
         #expect(!model.enabled)
         #expect(model.phase == .off)
         #expect(await fixture.worker.starts == 0)
+        #expect(!SettingsStore(defaults: fixture.defaults).isEnabled)
         await model.shutdown()
     }
 

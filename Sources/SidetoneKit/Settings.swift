@@ -110,6 +110,11 @@ public final class SettingsStore {
     private let key = "monitorSettings"
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
 
+    public var isEnabled: Bool {
+        get { defaults.bool(forKey: "monitoringEnabled") }
+        set { defaults.set(newValue, forKey: "monitoringEnabled") }
+    }
+
     public func load() -> MonitorSettings {
         guard let data = defaults.data(forKey: key),
             let settings = try? JSONDecoder().decode(MonitorSettings.self, from: data)

@@ -4,6 +4,23 @@ import Testing
 
 @Suite("Settings")
 struct SettingsTests {
+    @Test @MainActor func audioFeaturesSaveSeparateEnabledStates() throws {
+        let name = "SidetoneTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let microphone = SettingsStore(defaults: defaults)
+        let keyboard = KeyboardSettingsStore(defaults: defaults)
+        #expect(!microphone.isEnabled)
+        #expect(!keyboard.isEnabled)
+        microphone.isEnabled = true
+        #expect(SettingsStore(defaults: defaults).isEnabled)
+        #expect(!KeyboardSettingsStore(defaults: defaults).isEnabled)
+        keyboard.isEnabled = true
+        microphone.isEnabled = false
+        #expect(!SettingsStore(defaults: defaults).isEnabled)
+        #expect(KeyboardSettingsStore(defaults: defaults).isEnabled)
+    }
+
     @Test @MainActor func preferencesRoundTrip() throws {
         let name = "SidetoneTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))
