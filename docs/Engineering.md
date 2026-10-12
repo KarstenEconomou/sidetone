@@ -196,6 +196,10 @@ that needs to join an Audio Workgroup.
 
 ## Microphone signal processing
 
+Optional [neural noise suppression](NoiseSuppression.md) runs before gain and
+tone shaping. It is independent of the sound profile. Off has no added delay.
+The RNNoise path adds 30 ms at 48 kHz. Other rates include conversion delay.
+
 Direct mode applies gain and a 0.95 full-scale output ceiling. Gain has a 5 ms
 smoothing time constant. Non-finite input becomes silence. Output is always
 finite and bounded. The interface limits gain to -60 through 0 dB.
@@ -267,8 +271,11 @@ It does not require Accessibility permission. Launch at login uses
   safety offset. It excludes the callback buffer duration.
 - Queue latency describes audio held in the transport queue.
 - Resampler latency is the filter's group delay.
+- Suppression latency includes frame accumulation, model delay, and its sample
+  rate converters. This term is zero when suppression is off.
 - The displayed estimate adds the two device paths, both buffer durations,
-  queue latency, and resampler latency. It is not a physical measurement.
+  queue latency, resampler latency, and suppression latency. It is not a physical
+  measurement.
 - Callback and DSP times measure execution time with the monotonic host clock.
   They are not audio propagation time. Callback overruns count execution that
   exceeds one buffer period. Hardware overloads count Core Audio overload
@@ -280,6 +287,9 @@ Some device drivers report incomplete latency data. A physical loopback
 measurement is required to verify microphone-to-headphone latency.
 
 ## Microphone validation results
+
+The measurements in this section use noise suppression off. Suppression tests
+and their limits are in [Microphone noise suppression](NoiseSuppression.md).
 
 Validation uses an Apple Silicon MacBook Pro with macOS 26.6.1 and Swift 6.3.3.
 The release app builds with compiler warnings treated as errors. Its local

@@ -75,9 +75,14 @@ public final class KeyboardModel: ObservableObject {
         }
     }
 
+    public func restoreEnabledState() {
+        setEnabled(store.isEnabled)
+    }
+
     public func setEnabled(_ value: Bool) {
         guard !closed, enabled != value else { return }
         enabled = value
+        store.isEnabled = value
         configureDelivery()
         message = nil
         delivery.reset()

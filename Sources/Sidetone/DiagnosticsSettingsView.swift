@@ -31,12 +31,13 @@ struct DiagnosticsSettingsView: View {
                     MetricRow("Output buffer", milliseconds(model.metrics.outputBufferDurationMs))
                     MetricRow("Audio queue", milliseconds(model.metrics.queueLatencyMs))
                     MetricRow("Resampler", milliseconds(model.metrics.resamplerLatencyMs))
+                    MetricRow("Noise suppression", milliseconds(model.metrics.suppressionLatencyMs))
                 }
             } header: {
                 Text("Microphone latency")
             } footer: {
                 Text(
-                    "\(sessionDescription) These estimates use device reports and the audio queue, not physical measurements."
+                    "\(sessionDescription) These estimates use device reports, the audio queue, and processing delay. They are not physical measurements."
                 )
             }
             Section("Audio format") {
@@ -113,7 +114,6 @@ struct DiagnosticsSettingsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .background(.bar)
-            .overlay(alignment: .top) { Divider() }
         }
         .task(id: copied) {
             guard copied else { return }

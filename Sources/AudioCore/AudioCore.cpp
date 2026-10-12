@@ -1,5 +1,6 @@
 #include "include/AudioCore.h"
 #include "DSP.hpp"
+#include "NoiseSuppressor.hpp"
 #include <AudioToolbox/AudioToolbox.h>
 #include <CoreAudio/CoreAudio.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -227,7 +228,10 @@ struct STEngine {
         return -1;
     }
 
-    void setParameters(STParameters parameters) noexcept { dsp.setParameters(parameters); }
+    void setParameters(STParameters parameters) noexcept {
+        dsp.setParameters(parameters);
+        suppressor.setParameters(parameters.noiseSuppression != 0, parameters.suppressionStrength);
+    }
 
     STTelemetry telemetry() noexcept {
         try {
@@ -308,6 +312,7 @@ struct STEngine {
     std::vector<Listener> listeners;
     std::vector<BufferChange> bufferChanges;
     sidetone::DSP dsp;
+    sidetone::NoiseSuppressor suppressor;
     sidetone::AdaptiveTransport transport;
     std::atomic<UInt32> restart{0};
     std::atomic<OSStatus> callbackError{noErr};
@@ -427,6 +432,7 @@ struct STEngine {
             transport.render({outputMono.data(), frames});
         }
         const uint64_t dspStart = mach_absolute_time();
+        suppressor.process({outputMono.data(), frames});
         dsp.process({outputMono.data(), frames});
         const double dspMs = static_cast<double>(mach_absolute_time() - dspStart) * tickMs;
         if (dspMs > maxDSPMs.load(std::memory_order_relaxed))
@@ -645,6 +651,7 @@ struct STEngine {
         for (UInt32 channel = 0; channel < input.inputChannels; ++channel)
             inputList->mBuffers[channel].mNumberChannels = 1;
         dsp.prepare(output.sampleRate);
+        suppressor.prepare(output.sampleRate);
         if (!sharedUnit)
             transport.prepare(input.sampleRate, output.sampleRate, input.bufferFrames,
                               output.bufferFrames);
@@ -774,8 +781,10 @@ struct STEngine {
         result.inputDeviceLatencyMs = inputDeviceLatencyMs;
         result.outputDeviceLatencyMs = outputDeviceLatencyMs;
         result.resamplerLatencyMs = sharedUnit ? 0 : transport.resamplerLatencyMs();
+        result.suppressionLatencyMs = suppressor.latencyMs();
         result.estimatedLatencyMs =
-            deviceLatencyMs + result.queueLatencyMs + result.resamplerLatencyMs;
+            deviceLatencyMs + result.queueLatencyMs + result.resamplerLatencyMs +
+            result.suppressionLatencyMs;
         result.peakInput = inputPeak.exchange(0, std::memory_order_relaxed);
         result.peakOutput = outputPeak.exchange(0, std::memory_order_relaxed);
         result.maxCallbackMs = std::max(maxInputMs.load(std::memory_order_relaxed),

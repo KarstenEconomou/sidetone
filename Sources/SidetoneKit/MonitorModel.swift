@@ -80,11 +80,16 @@ public final class MonitorModel: ObservableObject {
         }
     }
 
+    public func restoreEnabledState() {
+        setEnabled(store.isEnabled)
+    }
+
     public func setEnabled(_ value: Bool) {
         guard !closed else { return }
         if value {
             guard !enabled else { return }
             enabled = true
+            store.isEnabled = true
             recovery.reset()
             message = nil
             permissionDenied = false
@@ -240,6 +245,7 @@ public final class MonitorModel: ObservableObject {
     @discardableResult
     private func stop(message: String? = nil) -> Task<EngineResult, Never> {
         enabled = false
+        if !closed { store.isEnabled = false }
         permissionGranted = false
         phase = .off
         self.message = message

@@ -40,6 +40,7 @@ package_app() (
     mkdir -p "$bundle_path/Contents/MacOS" "$bundle_path/Contents/Resources"
     xcrun lipo -create "${binaries[@]}" -output "$bundle_path/Contents/MacOS/$product"
     cp LICENSE "$bundle_path/Contents/Resources/License.txt"
+    cp ThirdParty/RNNoise/COPYING "$bundle_path/Contents/Resources/RNNoise-License.txt"
     if [[ "$product" == "Sidetone" ]]; then
         cp -R Sources/SidetoneKit/Resources/KeyboardSounds "$bundle_path/Contents/Resources/"
     fi
@@ -58,7 +59,18 @@ package_app() (
         /usr/libexec/PlistBuddy -c 'Delete :CFBundleIconFile' "$plist"
     fi
     identity="${SIGNING_IDENTITY:--}"
-    signing_options=(--force --sign "$identity" --options runtime --entitlements Resources/Sidetone.entitlements)
+    entitlements="Resources/Sidetone.entitlements"
+    if [[ "$product" == "Sidetone" ]]; then
+        source Scripts/lib/sparkle.sh
+        embed_sparkle "$bundle_path"
+        sign_sparkle "$bundle_path" "$identity"
+        if [[ "$identity" == "-" ]]; then
+            entitlements="$staging/Sidetone.entitlements"
+            cp Resources/Sidetone.entitlements "$entitlements"
+            /usr/libexec/PlistBuddy -c 'Add :com.apple.security.cs.disable-library-validation bool true' "$entitlements"
+        fi
+    fi
+    signing_options=(--force --sign "$identity" --options runtime --entitlements "$entitlements")
     if [[ "$identity" != "-" ]]; then signing_options+=(--timestamp); fi
     codesign "${signing_options[@]}" "$bundle_path"
     codesign --verify --deep --strict "$bundle_path"

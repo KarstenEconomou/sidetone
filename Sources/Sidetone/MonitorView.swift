@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor struct MonitorView: View {
     @ObservedObject var model: MonitorModel
     let keyboard: KeyboardModel
+    @ObservedObject var updater: UpdateController
     let openSettings: () -> Void
 
     var body: some View {
@@ -30,6 +31,11 @@ import SwiftUI
                     title: "Input", devices: model.inputDevices,
                     selection: model.binding(\.inputUID), isInput: true)
                 MenuVolumeSlider("Microphone volume", value: model.binding(\.gainDB))
+                Toggle("Noise suppression", isOn: model.binding(\.noiseSuppression))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .font(.callout)
+                    .help("Reduce background noise. Adjust strength in Settings.")
                 if let message = microphoneNotice {
                     AudioFeatureNotice(message: message) {
                         if model.permissionDenied {
@@ -41,6 +47,18 @@ import SwiftUI
             divider
             KeyboardControls(model: keyboard)
             divider
+            if let version = updater.availableVersion {
+                Button {
+                    updater.checkForUpdates()
+                } label: {
+                    Label("Update to \(version)…", systemImage: "arrow.down.circle")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderless)
+                .disabled(!updater.canCheckForUpdates)
+                .padding(12)
+                divider
+            }
             HStack {
                 Button(action: openSettings) {
                     Label("Settings…", systemImage: "gearshape")

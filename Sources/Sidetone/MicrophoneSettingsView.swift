@@ -33,6 +33,23 @@ struct MicrophoneSettingsView: View {
                 )
             }
             Section {
+                SettingsToggle(
+                    title: "Noise suppression",
+                    detail: "Reduce background noise while you speak.",
+                    isOn: model.binding(\.noiseSuppression))
+                SettingsSlider(
+                    title: "Strength", value: model.binding(\.noiseSuppressionStrength),
+                    range: 0...100, unit: "%"
+                )
+                .disabled(!model.settings.noiseSuppression)
+            } header: {
+                Text("Noise suppression")
+            } footer: {
+                Text(
+                    "Processing stays on this Mac and adds about 30 ms of delay. Lower strength keeps more of the original sound. Turn suppression off for the lowest delay. Other voices can remain audible."
+                )
+            }
+            Section {
                 VStack(alignment: .leading, spacing: 8) {
                     ProfilePicker(model: model)
                     Text(model.settings.profile.summary)

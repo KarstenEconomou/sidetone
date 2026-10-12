@@ -345,7 +345,9 @@ struct KeyboardLifecycleTests {
 
     @Test func keyboardRunsWithOnlyAnOutput() async throws {
         try await run { model, worker, events in
+            model.restoreEnabledState()
             #expect(!model.enabled)
+            #expect(events.requests == 0)
             model.setEnabled(true)
             try await waitUntil { model.phase == .listening }
             #expect(events.listening)
@@ -356,6 +358,43 @@ struct KeyboardLifecycleTests {
             #expect(model.phase == .off)
             try await waitUntil { await worker.poll().running == false }
         }
+    }
+
+    @Test func keyboardOnAndOffSurviveRelaunch() async throws {
+        let name = "KeyboardLifecycle.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let worker = KeyboardTestWorker()
+        let events = KeyboardTestEvents()
+        func makeModel() -> KeyboardModel {
+            KeyboardModel(
+                store: KeyboardSettingsStore(defaults: defaults), worker: worker,
+                events: events, startPolling: false)
+        }
+        let model = makeModel()
+        await model.poll()
+        model.setEnabled(true)
+        try await waitUntil { model.phase == .listening }
+        await model.shutdown()
+
+        let reopened = makeModel()
+        reopened.setOutputUID("other")
+        reopened.restoreEnabledState()
+        await reopened.poll()
+        try await waitUntil { reopened.phase == .listening }
+        #expect(reopened.enabled)
+        #expect(await worker.outputUID == "other")
+        reopened.setEnabled(false)
+        await reopened.shutdown()
+
+        let stopped = makeModel()
+        stopped.restoreEnabledState()
+        await stopped.poll()
+        #expect(!stopped.enabled)
+        #expect(stopped.phase == .off)
+        #expect(!events.listening)
+        #expect(await worker.starts == 2)
+        await stopped.shutdown()
     }
 
     @Test func diagnosticsDescribeCurrentKeyboardSettings() async throws {

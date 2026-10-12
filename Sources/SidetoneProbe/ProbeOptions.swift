@@ -4,6 +4,7 @@ struct ProbeOptions {
     let help: Bool
     let run: Bool
     let profiles: Bool
+    let suppression: Bool
     let inputID: UInt32?
     let outputID: UInt32?
     let seconds: Double
@@ -18,7 +19,7 @@ struct ProbeOptions {
         var arguments = arguments.makeIterator()
         while let argument = arguments.next() {
             switch argument {
-            case "--help", "--run", "--profiles":
+            case "--help", "--run", "--profiles", "--suppression":
                 flags.insert(argument)
             case "--input", "--output", "--seconds", "--cycles", "--frames", "--gain", "--log":
                 guard let value = arguments.next(), !value.hasPrefix("--") else {
@@ -47,6 +48,7 @@ struct ProbeOptions {
         help = flags.contains("--help")
         run = flags.contains("--run")
         profiles = flags.contains("--profiles")
+        suppression = flags.contains("--suppression")
         inputID = try number("--input", as: UInt32.self)
         outputID = try number("--output", as: UInt32.self)
         self.seconds = min(max(seconds, 1), 86400)

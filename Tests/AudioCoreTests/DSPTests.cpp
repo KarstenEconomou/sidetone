@@ -18,7 +18,7 @@ void require(bool condition, const char* message) {
 void testGain() {
     sidetone::DSP dsp;
     dsp.prepare(48000);
-    dsp.setParameters({-6, 0, 75, 1500, 0, 0.7f, 0});
+    dsp.setParameters({-6, 0, 75, 1500, 0, 0.7f, 0, 0, 0.85f});
     float previous = 0;
     float sample = 0;
     for (int index = 0; index < 4800; ++index) {
@@ -28,7 +28,7 @@ void testGain() {
     }
     require(std::abs(sample - 0.25f * std::pow(10.0f, -6.0f / 20.0f)) < 0.00001f,
             "gain matches decibels");
-    dsp.setParameters({6, 0, 75, 1500, 0, 0.7f, 0});
+    dsp.setParameters({6, 0, 75, 1500, 0, 0.7f, 0, 0, 0.85f});
     for (int index = 0; index < 4800; ++index)
         require(std::abs(dsp.process(2)) <= 0.95f, "output has a safe ceiling");
     require(dsp.clippedSamples() > 0, "clipping is counted");
@@ -107,27 +107,27 @@ double response(STParameters parameters, double frequency, double amplitude = 0.
     return std::sqrt(energy / (frames - frames / 2));
 }
 void testProfiles() {
-    const double direct = response({0, 0, 75, 1500, 0, 0.7f, 0}, 20);
-    const double natural = response({0, 1, 75, 1500, 0, 0.7f, 0}, 20);
-    const double voice = response({0, 2, 75, 1500, 0, 0.7f, 0}, 20);
+    const double direct = response({0, 0, 75, 1500, 0, 0.7f, 0, 0, 0.85f}, 20);
+    const double natural = response({0, 1, 75, 1500, 0, 0.7f, 0, 0, 0.85f}, 20);
+    const double voice = response({0, 2, 75, 1500, 0, 0.7f, 0, 0, 0.85f}, 20);
     require(natural < direct * 0.1, "Natural removes low frequency rumble");
     require(voice < natural * 0.7, "Voice has stronger low frequency shaping");
-    const double flat = response({0, 1, 75, 1500, 0, 0.7f, 0}, 1500);
-    const double boost = response({0, 1, 75, 1500, 6, 0.7f, 0}, 1500);
+    const double flat = response({0, 1, 75, 1500, 0, 0.7f, 0, 0, 0.85f}, 1500);
+    const double boost = response({0, 1, 75, 1500, 6, 0.7f, 0, 0, 0.85f}, 1500);
     require(std::abs(20.0 * std::log10(boost / flat) - 6) < 0.15,
             "parametric EQ reaches its selected gain");
-    const double dry = response({0, 1, 75, 1500, 0, 0.7f, 0}, 1000, 0.5);
-    const double compressed = response({0, 1, 75, 1500, 0, 0.7f, 1}, 1000, 0.5);
+    const double dry = response({0, 1, 75, 1500, 0, 0.7f, 0, 0, 0.85f}, 1000, 0.5);
+    const double compressed = response({0, 1, 75, 1500, 0, 0.7f, 1, 0, 0.85f}, 1000, 0.5);
     require(compressed < dry * 0.9 && compressed > dry * 0.2,
             "optional compression reduces strong signals");
-    const double directCompressed = response({0, 0, 75, 1500, 12, 0.7f, 1}, 1000, 0.5);
-    const double directDry = response({0, 0, 75, 1500, 0, 0.7f, 0}, 1000, 0.5);
+    const double directCompressed = response({0, 0, 75, 1500, 12, 0.7f, 1, 0, 0.85f}, 1000, 0.5);
+    const double directDry = response({0, 0, 75, 1500, 0, 0.7f, 0, 0, 0.85f}, 1000, 0.5);
     require(std::abs(directDry - directCompressed) < 1.0e-6, "Direct has no EQ or compression");
 }
 void testEQRateChanges() {
     sidetone::DSP dsp;
     dsp.prepare(8000);
-    dsp.setParameters({0, 1, 75, 10000, 6, 2.0f, 0});
+    dsp.setParameters({0, 1, 75, 10000, 6, 2.0f, 0, 0, 0.85f});
     for (const double rate : {48000.0, 8000.0, 96000.0}) {
         dsp.prepare(rate);
         const double frequency = std::min(10000.0, rate * 0.45);
@@ -147,25 +147,25 @@ void testEQRateChanges() {
 }
 void testEQWidth() {
     for (uint32_t profile : {1U, 2U}) {
-        double previous = response({0, profile, 75, 1500, 6, 4, 0}, 1800);
+        double previous = response({0, profile, 75, 1500, 6, 4, 0, 0, 0.85f}, 1800);
         for (float q : {4.1f, 4.5f, 5.0f}) {
-            const double narrower = response({0, profile, 75, 1500, 6, q, 0}, 1800);
+            const double narrower = response({0, profile, 75, 1500, 6, q, 0, 0, 0.85f}, 1800);
             require(narrower < previous - 0.000001,
                     "EQ width increases through Q 5 in Natural and Voice");
             previous = narrower;
         }
-        const double aboveLimit = response({0, profile, 75, 1500, 6, 6, 0}, 1800);
+        const double aboveLimit = response({0, profile, 75, 1500, 6, 6, 0, 0, 0.85f}, 1800);
         require(std::abs(aboveLimit - previous) < 0.000001, "EQ width is bounded at Q 5");
     }
 }
 void testProfileTransitions() {
     sidetone::DSP dsp;
     dsp.prepare(48000);
-    dsp.setParameters({0, 0, 75, 1500, 0, 0.7f, 0});
+    dsp.setParameters({0, 0, 75, 1500, 0, 0.7f, 0, 0, 0.85f});
     float previous = 0;
     for (int index = 0; index < 4800; ++index)
         previous = dsp.process(0.1f);
-    dsp.setParameters({0, 1, 75, 1500, 0, 0.7f, 0});
+    dsp.setParameters({0, 1, 75, 1500, 0, 0.7f, 0, 0, 0.85f});
     for (int index = 0; index < 10000; ++index) {
         const float output = dsp.process(0.1f);
         require(std::abs(output - previous) < 0.001f, "profile changes have no step");
@@ -178,7 +178,7 @@ void testProfileTransitions() {
         if (index % 127 == 0) {
             dsp.setParameters({6, random % 3, (random & 1) ? 300.0f : 20.0f,
                                (random & 2) ? 15000.0f : 80.0f, (random & 4) ? 12.0f : -12.0f,
-                               (random & 8) ? 5.0f : 0.2f, random % 2});
+                               (random & 8) ? 5.0f : 0.2f, random % 2, 0, 0.85f});
         }
         const float input =
             static_cast<float>(random) / static_cast<float>(UINT32_MAX) * 8.0f - 4.0f;
@@ -195,7 +195,7 @@ void testParameterConcurrency() {
             dsp.setParameters({static_cast<float>(index % 67) - 60, index % 3,
                                20.0f + static_cast<float>(index % 280),
                                80.0f + static_cast<float>(index % 15000),
-                               static_cast<float>(index % 25) - 12, 0.7f, index % 2});
+                               static_cast<float>(index % 25) - 12, 0.7f, index % 2, 0, 0.85f});
     });
     for (int index = 0; index < 1000000; ++index) {
         const float output = dsp.process(std::sin(static_cast<float>(index) * 0.1f));

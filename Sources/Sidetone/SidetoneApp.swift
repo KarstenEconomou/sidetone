@@ -19,6 +19,10 @@ enum SidetoneApp {
             withTitle: "About Sidetone", action: #selector(AppDelegate.showAbout(_:)),
             keyEquivalent: ""
         ).target = delegate
+        applicationMenu.addItem(
+            withTitle: "Check for Updates…", action: #selector(AppDelegate.checkForUpdates(_:)),
+            keyEquivalent: ""
+        ).target = delegate
         applicationMenu.addItem(.separator())
         applicationMenu.addItem(
             withTitle: "Settings…", action: #selector(AppDelegate.showSettings(_:)),
@@ -43,9 +47,12 @@ enum SidetoneApp {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSWindowDelegate,
+    NSMenuItemValidation
+{
     private let model = MonitorModel()
     private let keyboard = KeyboardModel()
+    private let updater = UpdateController()
     private let popover = NSPopover()
     private var statusItem: NSStatusItem?
     private var settingsWindow: NSWindow?
@@ -64,7 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         popover.behavior = .transient
         popover.delegate = self
         let host = NSHostingController(
-            rootView: MonitorView(model: model, keyboard: keyboard) { [weak self] in
+            rootView: MonitorView(model: model, keyboard: keyboard, updater: updater) {
+                [weak self] in
                 self?.showSettings(nil)
             })
         host.sizingOptions = .preferredContentSize
@@ -72,14 +80,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         model.$settings.map(\.outputUID).removeDuplicates().sink { [weak self] uid in
             MainActor.assumeIsolated { self?.keyboard.setOutputUID(uid) }
         }.store(in: &subscriptions)
-        model.$phase.combineLatest(keyboard.$phase).sink { [weak self] phase, keyboardPhase in
+        model.restoreEnabledState()
+        keyboard.restoreEnabledState()
+        model.$phase.combineLatest(keyboard.$phase, updater.$availableVersion).sink {
+            [weak self] phase, keyboardPhase, updateVersion in
             MainActor.assumeIsolated {
                 let microphoneOn = phase == .monitoring
                 let keyboardOn = keyboardPhase == .listening
                 let active = microphoneOn || keyboardOn
-                self?.statusItem?.button?.image = SidetoneGlyph.menuBarImage(active: active)
+                self?.statusItem?.button?.image = SidetoneGlyph.menuBarImage(
+                    active: active, updateAvailable: updateVersion != nil)
+                self?.statusItem?.button?.toolTip =
+                    updateVersion.map {
+                        "Sidetone \($0) is available."
+                    } ?? "Sidetone"
                 self?.statusItem?.button?.setAccessibilityValue(
                     "Microphone \(microphoneOn ? "on" : "off"), keyboard \(keyboardOn ? "on" : "off")"
+                        + (updateVersion.map { ", update \($0) available" } ?? "")
                 )
             }
         }.store(in: &subscriptions)
@@ -92,6 +109,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
             object: nil)
         center.addObserver(
             self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
+        updater.start()
         if !UserDefaults.standard.bool(forKey: "hasShownMenu") {
             togglePopover()
             UserDefaults.standard.set(true, forKey: "hasShownMenu")
@@ -115,7 +133,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         } else {
             window = NSWindow(
                 contentViewController: NSHostingController(
-                    rootView: SettingsView(model: model, keyboard: keyboard) { [weak self] in
+                    rootView: SettingsView(model: model, keyboard: keyboard, updater: updater) {
+                        [weak self] in
                         self?.showAbout(nil)
                     }))
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
@@ -164,6 +183,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate, NSW
         NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
         NSApp.activate(ignoringOtherApps: true)
         popover.performClose(nil)
+    }
+
+    @objc func checkForUpdates(_ sender: Any?) {
+        popover.performClose(nil)
+        updater.checkForUpdates()
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        menuItem.action != #selector(checkForUpdates(_:)) || updater.canCheckForUpdates
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)

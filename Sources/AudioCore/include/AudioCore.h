@@ -47,6 +47,8 @@ typedef struct {
     float eqGainDB;
     float eqQ;
     uint32_t compression;
+    uint32_t noiseSuppression;
+    float suppressionStrength; /* 0 through 1. */
 } STParameters;
 typedef struct {
     uint32_t running;
@@ -72,6 +74,7 @@ typedef struct {
     double outputDeviceLatencyMs;
     double resamplerLatencyMs;
     uint64_t hardwareOverloads;
+    double suppressionLatencyMs;
 } STTelemetry;
 uint32_t st_devices(STDevice* devices, uint32_t capacity);
 uint64_t st_device_generation(void);
