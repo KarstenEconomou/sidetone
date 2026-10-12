@@ -114,7 +114,6 @@ struct DiagnosticsSettingsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
             .background(.bar)
-            .overlay(alignment: .top) { Divider() }
         }
         .task(id: copied) {
             guard copied else { return }
