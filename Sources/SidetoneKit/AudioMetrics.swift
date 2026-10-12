@@ -23,6 +23,7 @@ public struct AudioMetrics: Sendable {
     public var inputDeviceLatencyMs = 0.0
     public var outputDeviceLatencyMs = 0.0
     public var resamplerLatencyMs = 0.0
+    public var suppressionLatencyMs = 0.0
     public var peakInput = 0.0
     public var peakOutput = 0.0
     public var maxCallbackMs = 0.0

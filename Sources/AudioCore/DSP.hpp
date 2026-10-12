@@ -87,7 +87,7 @@ class DSP {
     };
     void readParameters(bool immediate = false) noexcept;
     float compress(float value, double& envelope, double threshold, double exponent) noexcept;
-    STParameters requested_{-12, 0, 75, 1800, 0, 0.7f, 0};
+    STParameters requested_{-12, 0, 75, 1800, 0, 0.7f, 0, 0, 0.85f};
     double sampleRate_{48000};
     std::array<std::atomic<double>, filterCount * 5> coefficients_{};
     std::atomic<std::uint64_t> revision_{0};

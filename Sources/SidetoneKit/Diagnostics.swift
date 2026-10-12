@@ -9,6 +9,8 @@ extension MonitorModel {
         Input: \(route?.input.name ?? "Unavailable")
         Output: \(route?.output.name ?? "Unavailable")
         Profile: \(settings.profile.rawValue)
+        Noise suppression: \(settings.noiseSuppression ? "On" : "Off")
+        Suppression strength: \(String(format: "%.0f", settings.noiseSuppressionStrength)) percent
         Gain: \(String(format: "%.1f", settings.gainDB)) dB
         Input: \(Int(metrics.inputRate)) Hz / \(metrics.inputFrames) frames
         Output: \(Int(metrics.outputRate)) Hz / \(metrics.outputFrames) frames
@@ -19,6 +21,7 @@ extension MonitorModel {
         Output buffer duration: \(String(format: "%.2f", metrics.outputBufferDurationMs)) ms
         Queue latency: \(String(format: "%.2f", metrics.queueLatencyMs)) ms
         Resampler latency: \(String(format: "%.2f", metrics.resamplerLatencyMs)) ms
+        Suppression latency: \(String(format: "%.2f", metrics.suppressionLatencyMs)) ms
         Maximum callback: \(String(format: "%.3f", metrics.maxCallbackMs)) ms
         Maximum DSP: \(String(format: "%.3f", metrics.maxDSPMs)) ms
         Clock correction: \(String(format: "%.1f", metrics.driftPPM)) ppm

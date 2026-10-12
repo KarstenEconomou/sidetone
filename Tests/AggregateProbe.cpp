@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
                                                                    st_engine_destroy);
     if (!engine)
         return 1;
-    st_engine_set_parameters(engine.get(), {-60, 0, 80, 2500, 0, 0.7f, 0});
+    st_engine_set_parameters(engine.get(), {-60, 0, 80, 2500, 0, 0.7f, 0, 0, 0.85f});
     if (st_engine_start(engine.get(), {aggregate.id, aggregate.id, 0, buffer}) != 0) {
         std::fprintf(stderr, "Engine start failed: %s\n", st_engine_error(engine.get()));
         return 1;

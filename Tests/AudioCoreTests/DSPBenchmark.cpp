@@ -16,7 +16,7 @@ int main() {
     for (std::uint32_t profile = 0; profile < 3; ++profile) {
         sidetone::DSP dsp;
         dsp.prepare(48000);
-        dsp.setParameters({-6, profile, 75, 2000, 2, 0.7f, 1});
+        dsp.setParameters({-6, profile, 75, 2000, 2, 0.7f, 1, 0, 0.85f});
         times.clear();
         for (int pass = 0; pass < iterations; ++pass) {
             for (std::uint32_t index = 0; index < frames; ++index)

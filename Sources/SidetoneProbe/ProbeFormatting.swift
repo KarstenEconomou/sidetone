@@ -25,12 +25,13 @@ extension STTelemetry {
                 RUN cycle=%d time=%.1f rate=%.0f/%.0f frames=%u/%u callbacks=%llu/%llu \
                 underruns=%llu overruns=%llu deadlines=%llu clip=%llu \
                 input_peak=%.6f output_peak=%.6f estimated_ms=%.3f queue_ms=%.3f \
-                callback_max_ms=%.4f dsp_max_ms=%.4f drift_ppm=%.2f restart=%u hardware_overloads=%llu
+                callback_max_ms=%.4f dsp_max_ms=%.4f drift_ppm=%.2f restart=%u hardware_overloads=%llu \
+                suppression_ms=%.3f
                 """,
             cycle, elapsed, inputRate, outputRate, inputBufferFrames, outputBufferFrames,
             inputCallbacks, outputCallbacks, underruns, overruns, deadlineMisses, clippedSamples,
             peakInput, peakOutput, estimatedLatencyMs, queueLatencyMs, maxCallbackMs, maxDSPMs,
-            driftPPM, needsRestart, hardwareOverloads
+            driftPPM, needsRestart, hardwareOverloads, suppressionLatencyMs
         )
     }
 }

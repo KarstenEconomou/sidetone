@@ -21,9 +21,53 @@ struct SettingsTests {
         saved.eqGainDB = 2
         saved.eqQ = 5
         saved.compression = true
+        saved.noiseSuppression = true
+        saved.noiseSuppressionStrength = 72
         saved.globalShortcut = true
         store.save(saved)
         #expect(SettingsStore(defaults: defaults).load() == saved)
+    }
+
+    @Test @MainActor func missingSuppressionSettingsPreserveOtherPreferences() throws {
+        let name = "SidetoneTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let data = Data(
+            """
+            {"inputUID":"mic","outputUID":"headphones","gainDB":-27,
+             "profile":"Voice","bufferFrames":128,"inputChannel":2,
+             "highPassHz":95,"eqFrequencyHz":3400,"eqGainDB":2,"eqQ":0.8,
+             "compression":true,"globalShortcut":true}
+            """.utf8)
+        defaults.set(data, forKey: "monitorSettings")
+        let value = SettingsStore(defaults: defaults).load()
+        #expect(value.inputUID == "mic")
+        #expect(value.outputUID == "headphones")
+        #expect(value.gainDB == -27)
+        #expect(value.profile == .voice)
+        #expect(value.bufferFrames == 128)
+        #expect(value.inputChannel == 2)
+        #expect(value.highPassHz == 95)
+        #expect(value.eqFrequencyHz == 3400)
+        #expect(value.eqGainDB == 2)
+        #expect(value.eqQ == 0.8)
+        #expect(value.compression)
+        #expect(value.globalShortcut)
+        #expect(!value.noiseSuppression)
+        #expect(value.noiseSuppressionStrength == 85)
+    }
+
+    @Test func suppressionStrengthHasFiniteBounds() {
+        var value = MonitorSettings()
+        value.noiseSuppressionStrength = .nan
+        value.normalize()
+        #expect(value.noiseSuppressionStrength == 85)
+        value.noiseSuppressionStrength = 200
+        value.normalize()
+        #expect(value.noiseSuppressionStrength == 100)
+        value.noiseSuppressionStrength = -20
+        value.normalize()
+        #expect(value.noiseSuppressionStrength == 0)
     }
 
     @Test @MainActor func corruptSettingsUseSafeDefaults() throws {

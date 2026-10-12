@@ -13,7 +13,7 @@ struct Probe {
                 print(
                     """
                     SidetoneProbe [--run --input ID --output ID] [--seconds 10] [--cycles 1]
-                                  [--frames 64] [--gain -60] [--profiles] [--log PATH]
+                                  [--frames 64] [--gain -60] [--profiles] [--suppression] [--log PATH]
                     With no arguments, list devices. --run captures the microphone and plays it
                     through the selected output. Gain is limited to -60 through -12 dB.
                     Audio is never saved. --log saves only numeric diagnostic values.
@@ -60,7 +60,8 @@ struct Probe {
             inputChannel: 0, bufferFrames: options.frames)
         var parameters = STParameters(
             gainDB: options.gainDB, profile: 0, highPassHz: 80,
-            eqFrequencyHz: 2200, eqGainDB: 0, eqQ: 0.7, compression: 0)
+            eqFrequencyHz: 2200, eqGainDB: 0, eqQ: 0.7, compression: 0,
+            noiseSuppression: options.suppression ? 1 : 0, suppressionStrength: 0.85)
         st_engine_set_parameters(engine, parameters)
         let clock = ContinuousClock()
         var failed = false

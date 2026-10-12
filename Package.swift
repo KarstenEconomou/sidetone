@@ -10,7 +10,20 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "RNNoise",
+            path: "ThirdParty/RNNoise",
+            exclude: ["COPYING", "ORIGIN.json"],
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("src"),
+                .define("RNNOISE_BUILD"),
+                .define("DISABLE_DEBUG_FLOAT"),
+                .unsafeFlags(["-O3"]),
+            ]
+        ),
+        .target(
             name: "AudioCore",
+            dependencies: ["RNNoise"],
             publicHeadersPath: "include",
             cxxSettings: [.unsafeFlags(["-Wall", "-Wextra", "-Werror"])],
             linkerSettings: [

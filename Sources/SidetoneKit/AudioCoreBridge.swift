@@ -94,6 +94,7 @@ extension AudioMetrics {
         inputDeviceLatencyMs = raw.inputDeviceLatencyMs
         outputDeviceLatencyMs = raw.outputDeviceLatencyMs
         resamplerLatencyMs = raw.resamplerLatencyMs
+        suppressionLatencyMs = raw.suppressionLatencyMs
         peakInput = raw.peakInput
         peakOutput = raw.peakOutput
         maxCallbackMs = raw.maxCallbackMs
@@ -145,7 +146,9 @@ extension STParameters {
             eqFrequencyHz: Float(settings.eqFrequencyHz),
             eqGainDB: Float(settings.eqGainDB),
             eqQ: Float(settings.eqQ),
-            compression: settings.compression ? 1 : 0
+            compression: settings.compression ? 1 : 0,
+            noiseSuppression: settings.noiseSuppression ? 1 : 0,
+            suppressionStrength: Float(settings.noiseSuppressionStrength / 100)
         )
     }
 }

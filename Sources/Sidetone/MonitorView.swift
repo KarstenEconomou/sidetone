@@ -30,6 +30,11 @@ import SwiftUI
                     title: "Input", devices: model.inputDevices,
                     selection: model.binding(\.inputUID), isInput: true)
                 MenuVolumeSlider("Microphone volume", value: model.binding(\.gainDB))
+                Toggle("Noise suppression", isOn: model.binding(\.noiseSuppression))
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .font(.callout)
+                    .help("Reduce background noise. Adjust strength in Settings.")
                 if let message = microphoneNotice {
                     AudioFeatureNotice(message: message) {
                         if model.permissionDenied {

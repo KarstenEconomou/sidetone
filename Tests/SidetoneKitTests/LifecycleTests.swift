@@ -429,8 +429,10 @@ struct LifecycleTests {
         var parameters = ParameterState()
         var loud = MonitorSettings()
         loud.gainDB = -1
+        loud.noiseSuppression = true
         var recovery = loud
         recovery.gainDB = -18
+        recovery.noiseSuppression = false
         let acceptedGain = parameters.receive(loud, revision: 1)
         let acceptedRecovery = parameters.receive(recovery, revision: 2)
         let acceptedDelayedGain = parameters.receive(loud, revision: 1)
@@ -438,8 +440,10 @@ struct LifecycleTests {
         #expect(acceptedRecovery)
         #expect(!acceptedDelayedGain)
         #expect(parameters.settings.gainDB == -18)
+        #expect(!parameters.settings.noiseSuppression)
         let acceptedNewGain = parameters.receive(loud, revision: 3)
         #expect(acceptedNewGain)
         #expect(parameters.settings.gainDB == -1)
+        #expect(parameters.settings.noiseSuppression)
     }
 }

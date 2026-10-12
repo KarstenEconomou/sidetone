@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/xiph/rnnoise",
+  "commit": "70f1d256acd4b34a572f999a05c87bf00b67730d",
+  "model_url": "https://media.xiph.org/rnnoise/models/rnnoise_data-0a8755f8e2d834eff6a54714ecc7d75f9932e845df35f8b59bc52a7cfe6e8b37.tar.gz",
+  "model_archive_sha256": "0a8755f8e2d834eff6a54714ecc7d75f9932e845df35f8b59bc52a7cfe6e8b37",
+  "model_source_sha256": "647247207aedb933d497600deb6a0ca2ae2963ebbbbe9b078a9c75d159e7ab8c",
+  "model_transform": "Remove the seven DISABLE_DEBUG_FLOAT blocks. Use the default quantized model. Keep all other weights and source code unchanged.",
+  "source_transform": "Remove trailing whitespace and blank lines at EOF in src/denoise.c and src/pitch.c."
+}

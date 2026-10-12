@@ -27,9 +27,39 @@ public struct MonitorSettings: Codable, Equatable, Sendable {
     public var eqGainDB = 1.5
     public var eqQ = 0.7
     public var compression = false
+    public var noiseSuppression = false
+    public var noiseSuppressionStrength = 85.0
     public var globalShortcut = false
 
     public init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case inputUID, outputUID, gainDB, profile, bufferFrames, inputChannel
+        case highPassHz, eqFrequencyHz, eqGainDB, eqQ, compression, globalShortcut
+        case noiseSuppression, noiseSuppressionStrength
+    }
+
+    public init(from decoder: Decoder) throws {
+        self.init()
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        inputUID = try values.decodeIfPresent(String.self, forKey: .inputUID)
+        outputUID = try values.decodeIfPresent(String.self, forKey: .outputUID)
+        gainDB = try values.decodeIfPresent(Double.self, forKey: .gainDB) ?? gainDB
+        profile = try values.decodeIfPresent(MonitorProfile.self, forKey: .profile) ?? profile
+        bufferFrames = try values.decodeIfPresent(Int.self, forKey: .bufferFrames) ?? bufferFrames
+        inputChannel = try values.decodeIfPresent(Int.self, forKey: .inputChannel) ?? inputChannel
+        highPassHz = try values.decodeIfPresent(Double.self, forKey: .highPassHz) ?? highPassHz
+        eqFrequencyHz =
+            try values.decodeIfPresent(Double.self, forKey: .eqFrequencyHz) ?? eqFrequencyHz
+        eqGainDB = try values.decodeIfPresent(Double.self, forKey: .eqGainDB) ?? eqGainDB
+        eqQ = try values.decodeIfPresent(Double.self, forKey: .eqQ) ?? eqQ
+        compression = try values.decodeIfPresent(Bool.self, forKey: .compression) ?? compression
+        globalShortcut =
+            try values.decodeIfPresent(Bool.self, forKey: .globalShortcut) ?? globalShortcut
+        noiseSuppression = try values.decodeIfPresent(Bool.self, forKey: .noiseSuppression) ?? false
+        noiseSuppressionStrength =
+            try values.decodeIfPresent(Double.self, forKey: .noiseSuppressionStrength) ?? 85
+    }
 
     public mutating func selectProfile(_ profile: MonitorProfile) {
         self.profile = profile
@@ -54,6 +84,7 @@ public struct MonitorSettings: Codable, Equatable, Sendable {
         eqFrequencyHz = Self.clamp(eqFrequencyHz, 100...10000, fallback: 2200)
         eqGainDB = Self.clamp(eqGainDB, -12...12, fallback: 0)
         eqQ = Self.clamp(eqQ, 0.2...5, fallback: 0.7)
+        noiseSuppressionStrength = Self.clamp(noiseSuppressionStrength, 0...100, fallback: 85)
         bufferFrames = min(2048, max(16, bufferFrames))
         inputChannel = min(255, max(0, inputChannel))
         if inputUID?.isEmpty == true { inputUID = nil }
