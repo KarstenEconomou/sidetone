@@ -6,11 +6,19 @@ enum SidetoneGlyph {
         0x7BECFD, 0x8DCDF8, 0xC9BAF8, 0xC6A1F9, 0xA190FD, 0x8685F0, 0x4C5CE2,
     ]
 
-    static func menuBarImage(active: Bool) -> NSImage {
-        let image = image(
-            size: NSSize(width: 16, height: 16), template: true,
-            lineWidth: active ? 1.75 : 1.5)
-        image.accessibilityDescription = active ? "Sidetone is on" : "Sidetone is off"
+    static func menuBarImage(active: Bool, updateAvailable: Bool = false) -> NSImage {
+        let image = NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in
+            draw(in: rect, lineWidth: active ? 1.75 : 1.5)
+            if updateAvailable {
+                NSColor.labelColor.setFill()
+                NSBezierPath(ovalIn: NSRect(x: 12, y: 12, width: 4, height: 4)).fill()
+            }
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription =
+            (active ? "Sidetone is on" : "Sidetone is off")
+            + (updateAvailable ? ", update available" : "")
         return image
     }
 

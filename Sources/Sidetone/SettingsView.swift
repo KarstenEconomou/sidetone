@@ -27,6 +27,7 @@ private enum SettingsPane: String, CaseIterable, Identifiable {
 struct SettingsView: View {
     let model: MonitorModel
     let keyboard: KeyboardModel
+    let updater: UpdateController
     let openAbout: () -> Void
     @State private var pane: SettingsPane? = .general
 
@@ -65,7 +66,7 @@ struct SettingsView: View {
 
     @ViewBuilder private var detail: some View {
         switch pane ?? .general {
-        case .general: GeneralSettingsView(model: model, openAbout: openAbout)
+        case .general: GeneralSettingsView(model: model, updater: updater, openAbout: openAbout)
         case .microphone: MicrophoneSettingsView(model: model)
         case .keyboard: KeyboardSettingsView(model: keyboard)
         case .diagnostics: DiagnosticsSettingsView(model: model, keyboard: keyboard)

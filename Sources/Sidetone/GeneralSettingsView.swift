@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct GeneralSettingsView: View {
     @ObservedObject var model: MonitorModel
+    @ObservedObject var updater: UpdateController
     let openAbout: () -> Void
 
     var body: some View {
@@ -44,6 +45,35 @@ struct GeneralSettingsView: View {
             }
             Section {
                 LabeledContent("Version", value: version)
+                Toggle(
+                    "Automatically check for updates",
+                    isOn: Binding(
+                        get: { updater.automaticallyChecksForUpdates },
+                        set: { updater.setAutomaticallyChecksForUpdates($0) })
+                )
+                .disabled(updater.error != nil)
+                if let available = updater.availableVersion {
+                    LabeledContent("Available version", value: available)
+                }
+                Button("Check for Updates…", action: updater.checkForUpdates)
+                    .disabled(!updater.canCheckForUpdates)
+                if let date = updater.lastUpdateCheckDate {
+                    LabeledContent("Last checked") {
+                        Text(date, format: .dateTime.month().day().hour().minute())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if let error = updater.error {
+                    Text(error).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text(
+                    "Sidetone checks once a day. You choose when to download and install an update."
+                )
+            }
+            Section {
                 Button("About Sidetone…", action: openAbout)
             } header: {
                 Text("Sidetone")

@@ -8,6 +8,9 @@ let package = Package(
         .executable(name: "Sidetone", targets: ["Sidetone"]),
         .executable(name: "SidetoneProbe", targets: ["SidetoneProbe"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0")
+    ],
     targets: [
         .target(
             name: "RNNoise",
@@ -36,8 +39,12 @@ let package = Package(
             resources: [.copy("Resources/KeyboardSounds")],
             swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
         .executableTarget(
-            name: "Sidetone", dependencies: ["SidetoneKit"],
-            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
+            name: "Sidetone",
+            dependencies: ["SidetoneKit", .product(name: "Sparkle", package: "Sparkle")],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])],
+            linkerSettings: [
+                .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])
+            ]),
         .executableTarget(
             name: "SidetoneProbe", dependencies: ["AudioCore"],
             swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]),
