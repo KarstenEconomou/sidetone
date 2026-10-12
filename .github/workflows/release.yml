@@ -63,7 +63,7 @@ jobs:
           else
             gh release create "$tag" "$archive" "$archive.sha256" \
               --target "$GITHUB_SHA" --draft --title "Sidetone $RELEASE_VERSION" \
-              --generate-notes --notes 'This download supports macOS 13 and later on Apple Silicon and Intel. It uses ad hoc signing and is not notarized. macOS can show a security warning. The source code for this build is in the source archives below. Sidetone is licensed under GPL-3.0-only.'
+              --generate-notes --notes 'This download supports macOS 13 and later on Apple Silicon and Intel. It uses ad hoc signing and is not notarized. macOS can show a security warning and require microphone or Input Monitoring approval again after an update. The source code for this build is in the source archives below. Sidetone is licensed under GPL-3.0-only.'
           fi
       - name: Sign update feed
         env:
