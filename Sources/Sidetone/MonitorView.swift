@@ -32,7 +32,7 @@ import SwiftUI
                 MenuVolumeSlider("Microphone volume", value: model.binding(\.gainDB))
                 Toggle("Noise suppression", isOn: model.binding(\.noiseSuppression))
                     .toggleStyle(.switch)
-                    .controlSize(.mini)
+                    .controlSize(.small)
                     .font(.callout)
                     .help("Reduce background noise. Adjust strength in Settings.")
                 if let message = microphoneNotice {
