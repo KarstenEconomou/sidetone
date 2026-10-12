@@ -15,3 +15,4 @@ xcrun stapler staple dist/Sidetone.app
 xcrun stapler validate dist/Sidetone.app
 spctl --assess --type execute --verbose dist/Sidetone.app
 Scripts/archive.sh
+Scripts/appcast.sh

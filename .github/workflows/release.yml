@@ -35,6 +35,10 @@ jobs:
           test "$GITHUB_REF" = refs/heads/main
           git merge-base --is-ancestor HEAD origin/main
           python3 Scripts/version.py release "$RELEASE_VERSION"
+      - name: Check update signing key
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: test -n "$SPARKLE_PRIVATE_KEY"
       - name: Test release versions
         run: python3 -m unittest discover -s Tests -p '*ReleaseTests.py'
       - name: Run tests
@@ -61,3 +65,11 @@ jobs:
               --target "$GITHUB_SHA" --draft --title "Sidetone $RELEASE_VERSION" \
               --generate-notes --notes 'This download supports macOS 13 and later on Apple Silicon and Intel. It uses ad hoc signing and is not notarized. macOS can show a security warning. The source code for this build is in the source archives below. Sidetone is licensed under GPL-3.0-only.'
           fi
+      - name: Sign update feed
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          gh release view "v$RELEASE_VERSION" --json body --jq .body > "$RUNNER_TEMP/release-notes.md"
+          Scripts/appcast.sh "$RUNNER_TEMP/release-notes.md"
+      - name: Add update feed to draft release
+        run: gh release upload "v$RELEASE_VERSION" dist/appcast.xml --clobber
